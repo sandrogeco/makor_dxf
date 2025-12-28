@@ -321,6 +321,9 @@
                 <button class="control-btn full-width" onclick="loadCSVData()" style="margin-top: 12px;">
                     <span>🔄 Ricarica CSV</span>
                 </button>
+                <button class="control-btn full-width" onclick="downloadCSV()" style="margin-top: 8px;">
+                    <span>💾 Esporta CSV</span>
+                </button>
             </div>
 
             <!-- Offset Y -->
@@ -1013,28 +1016,45 @@
             }
         }
 
-        function exportToCSV(data) {
+        function downloadCSV() {
+            if (chartState.data.length === 0) {
+                alert('Nessun dato disponibile. Carica prima un file DXF.');
+                return;
+            }
+
             try {
                 let csv = 'X,Y\n';
-                data.forEach(point => {
+                chartState.data.forEach(point => {
                     csv += point.x.toFixed(6) + ',' + point.y.toFixed(6) + '\n';
                 });
 
-                // Crea blob e download
-                const blob = new Blob([csv], { type: 'text/csv' });
+                // Crea blob e scarica
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'dxf_output.csv';
-                // Non fare auto-download, solo log
-                console.log('CSV generato (' + data.length + ' punti). Usa il link per scaricare.');
 
-                // Puoi decommentare per auto-download:
-                // a.click();
-                // window.URL.revokeObjectURL(url);
+                // Nome file con timestamp
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                a.download = `dxf_export_${timestamp}.csv`;
+
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                console.log('CSV scaricato: ' + chartState.data.length + ' punti');
+                document.getElementById('connectionStatus').textContent = 'CSV esportato (' + chartState.data.length + ' punti)';
             } catch (error) {
                 console.error('Errore export CSV:', error);
+                alert('Errore durante l\'esportazione del CSV: ' + error.message);
             }
+        }
+
+        function exportToCSV(data) {
+            // Funzione legacy chiamata automaticamente dopo il parsing
+            // Ora non fa nulla, l'export è manuale tramite pulsante
+            console.log('CSV pronto per l\'export (' + data.length + ' punti). Usa il pulsante "Esporta CSV".');
         }
 
         // Carica automaticamente all'avvio
