@@ -308,74 +308,6 @@
         </div>
 
         <div class="controls-panel">
-            <!-- Zoom X -->
-            <div class="control-group">
-                <h3>🔍 Zoom X</h3>
-                <div class="button-grid">
-                    <button class="control-btn" onclick="zoomX(1.2)"><span>Zoom In</span></button>
-                    <button class="control-btn" onclick="zoomX(0.8)"><span>Zoom Out</span></button>
-                </div>
-                <div class="slider-container">
-                    <div class="slider-label">
-                        <span>Livello</span>
-                        <span class="slider-value" id="zoomXValue">1.00x</span>
-                    </div>
-                    <input type="range" id="zoomXSlider" min="0.1" max="10" step="0.1" value="1" oninput="setZoomX(this.value)">
-                </div>
-            </div>
-
-            <!-- Zoom Y -->
-            <div class="control-group">
-                <h3>🔍 Zoom Y</h3>
-                <div class="button-grid">
-                    <button class="control-btn" onclick="zoomY(1.2)"><span>Zoom In</span></button>
-                    <button class="control-btn" onclick="zoomY(0.8)"><span>Zoom Out</span></button>
-                </div>
-                <div class="slider-container">
-                    <div class="slider-label">
-                        <span>Livello</span>
-                        <span class="slider-value" id="zoomYValue">1.00x</span>
-                    </div>
-                    <input type="range" id="zoomYSlider" min="0.1" max="10" step="0.1" value="1" oninput="setZoomY(this.value)">
-                </div>
-            </div>
-
-            <!-- Pan X -->
-            <div class="control-group">
-                <h3>↔️ Pan X</h3>
-                <div class="button-grid">
-                    <button class="control-btn" onclick="panX(-20)"><span>← Sinistra</span></button>
-                    <button class="control-btn" onclick="panX(20)"><span>Destra →</span></button>
-                    <button class="control-btn full-width" onclick="resetPanX()"><span>Reset Pan X</span></button>
-                </div>
-            </div>
-
-            <!-- Pan Y -->
-            <div class="control-group">
-                <h3>↕️ Pan Y</h3>
-                <div class="button-grid">
-                    <button class="control-btn" onclick="panY(-20)"><span>↑ Su</span></button>
-                    <button class="control-btn" onclick="panY(20)"><span>Giù ↓</span></button>
-                    <button class="control-btn full-width" onclick="resetPanY()"><span>Reset Pan Y</span></button>
-                </div>
-            </div>
-
-            <!-- AutoScale -->
-            <div class="control-group">
-                <h3>⚙️ AutoScale</h3>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button class="control-btn toggle-btn active" id="autoScaleX" onclick="toggleAutoScale('x')" style="flex: 1; min-width: 120px;">
-                        <span>AutoScale X</span>
-                    </button>
-                    <button class="control-btn toggle-btn active" id="autoScaleY" onclick="toggleAutoScale('y')" style="flex: 1; min-width: 120px;">
-                        <span>AutoScale Y</span>
-                    </button>
-                </div>
-                <button class="control-btn full-width" onclick="resetAll()" style="margin-top: 8px;">
-                    <span>🔄 Reset Tutto</span>
-                </button>
-            </div>
-
             <!-- Upload DXF & Data -->
             <div class="control-group">
                 <h3>📊 Dati</h3>
@@ -390,6 +322,40 @@
                     <span>🔄 Ricarica CSV</span>
                 </button>
             </div>
+
+            <!-- Offset Y -->
+            <div class="control-group">
+                <h3>↕️ Offset Verticale</h3>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Offset Y</span>
+                        <span class="slider-value" id="offsetYValue">0</span>
+                    </div>
+                    <input type="number" id="offsetYInput" value="0" step="10"
+                           oninput="setOffsetY(this.value)"
+                           style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">
+                </div>
+                <button class="control-btn full-width" onclick="resetOffset()" style="margin-top: 8px;">
+                    <span>Reset Offset</span>
+                </button>
+            </div>
+
+            <!-- Passo Interpolazione -->
+            <div class="control-group">
+                <h3>🔧 Passo Interpolazione</h3>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Precisione</span>
+                        <span class="slider-value" id="interpolationValue">0.005</span>
+                    </div>
+                    <input type="number" id="interpolationInput" value="0.005" step="0.001" min="0.001" max="1"
+                           oninput="setInterpolationStep(this.value)"
+                           style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+                    Più basso = più punti (ricarica DXF dopo modifica)
+                </div>
+            </div>
         </div>
 
         <div class="info-panel">
@@ -398,24 +364,20 @@
                 <span class="info-value" id="dataPointsCount">0</span>
             </div>
             <div class="info-item">
-                <span class="info-label">Zoom X</span>
-                <span class="info-value" id="currentZoomX">1.00x</span>
+                <span class="info-label">Offset Y</span>
+                <span class="info-value" id="currentOffsetY">0</span>
             </div>
             <div class="info-item">
-                <span class="info-label">Zoom Y</span>
-                <span class="info-value" id="currentZoomY">1.00x</span>
+                <span class="info-label">Interpolazione</span>
+                <span class="info-value" id="currentInterpolation">0.005</span>
             </div>
             <div class="info-item">
-                <span class="info-label">Pan X</span>
-                <span class="info-value" id="currentPanX">0</span>
+                <span class="info-label">Range X</span>
+                <span class="info-value" id="rangeX">-</span>
             </div>
             <div class="info-item">
-                <span class="info-label">Pan Y</span>
-                <span class="info-value" id="currentPanY">0</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">AutoScale</span>
-                <span class="info-value" id="autoScaleStatus">X, Y</span>
+                <span class="info-label">Range Y</span>
+                <span class="info-value" id="rangeY">-</span>
             </div>
         </div>
     </div>
@@ -423,16 +385,11 @@
     <script>
         let chartState = {
             data: [],
-            zoomX: 1,
-            zoomY: 1,
-            panX: 0,
-            panY: 0,
-            autoScaleX: true,
-            autoScaleY: true,
-            isDragging: false,
-            lastMouseX: 0,
-            lastMouseY: 0
+            offsetY: 0
         };
+
+        let INTERPOLATION_STEP = 0.005;
+        const SCALE_FACTOR = 1000.0;
 
         const canvas = document.getElementById('chartCanvas');
         const ctx = canvas.getContext('2d');
@@ -501,99 +458,45 @@
         }
 
         // ===== CONTROLLI =====
-        function zoomX(factor) {
-            chartState.zoomX *= factor;
-            chartState.zoomX = Math.max(0.1, Math.min(10, chartState.zoomX));
+        function setOffsetY(value) {
+            chartState.offsetY = parseFloat(value) || 0;
             updateUI();
             drawChart();
         }
 
-        function zoomY(factor) {
-            chartState.zoomY *= factor;
-            chartState.zoomY = Math.max(0.1, Math.min(10, chartState.zoomY));
+        function resetOffset() {
+            chartState.offsetY = 0;
+            document.getElementById('offsetYInput').value = 0;
             updateUI();
             drawChart();
         }
 
-        function setZoomX(value) {
-            chartState.zoomX = parseFloat(value);
+        function setInterpolationStep(value) {
+            INTERPOLATION_STEP = parseFloat(value) || 0.005;
             updateUI();
-            drawChart();
-        }
-
-        function setZoomY(value) {
-            chartState.zoomY = parseFloat(value);
-            updateUI();
-            drawChart();
-        }
-
-        function panX(amount) {
-            chartState.panX += amount;
-            updateUI();
-            drawChart();
-        }
-
-        function panY(amount) {
-            chartState.panY += amount;
-            updateUI();
-            drawChart();
-        }
-
-        function resetPanX() {
-            chartState.panX = 0;
-            updateUI();
-            drawChart();
-        }
-
-        function resetPanY() {
-            chartState.panY = 0;
-            updateUI();
-            drawChart();
-        }
-
-        function toggleAutoScale(axis) {
-            if (axis === 'x') {
-                chartState.autoScaleX = !chartState.autoScaleX;
-                document.getElementById('autoScaleX').classList.toggle('active');
-            } else {
-                chartState.autoScaleY = !chartState.autoScaleY;
-                document.getElementById('autoScaleY').classList.toggle('active');
-            }
-            updateUI();
-            drawChart();
-        }
-
-        function resetAll() {
-            chartState.zoomX = 1;
-            chartState.zoomY = 1;
-            chartState.panX = 0;
-            chartState.panY = 0;
-            chartState.autoScaleX = true;
-            chartState.autoScaleY = true;
-            document.getElementById('autoScaleX').classList.add('active');
-            document.getElementById('autoScaleY').classList.add('active');
-            document.getElementById('zoomXSlider').value = 1;
-            document.getElementById('zoomYSlider').value = 1;
-            updateUI();
-            drawChart();
         }
 
         function updateUI() {
-            document.getElementById('zoomXValue').textContent = chartState.zoomX.toFixed(2) + 'x';
-            document.getElementById('zoomYValue').textContent = chartState.zoomY.toFixed(2) + 'x';
             document.getElementById('dataPointsCount').textContent = chartState.data.length;
-            document.getElementById('currentZoomX').textContent = chartState.zoomX.toFixed(2) + 'x';
-            document.getElementById('currentZoomY').textContent = chartState.zoomY.toFixed(2) + 'x';
-            document.getElementById('currentPanX').textContent = chartState.panX.toFixed(0);
-            document.getElementById('currentPanY').textContent = chartState.panY.toFixed(0);
+            document.getElementById('offsetYValue').textContent = chartState.offsetY.toFixed(0);
+            document.getElementById('currentOffsetY').textContent = chartState.offsetY.toFixed(0);
+            document.getElementById('interpolationValue').textContent = INTERPOLATION_STEP.toFixed(3);
+            document.getElementById('currentInterpolation').textContent = INTERPOLATION_STEP.toFixed(3);
 
-            let autoScaleText = [];
-            if (chartState.autoScaleX) autoScaleText.push('X');
-            if (chartState.autoScaleY) autoScaleText.push('Y');
-            document.getElementById('autoScaleStatus').textContent = autoScaleText.length > 0 ? autoScaleText.join(', ') : 'Off';
-
-            document.getElementById('zoomXSlider').value = chartState.zoomX;
-            document.getElementById('zoomYSlider').value = chartState.zoomY;
+            // Calcola range se ci sono dati
+            if (chartState.data.length > 0) {
+                const xValues = chartState.data.map(p => p.x);
+                const yValues = chartState.data.map(p => p.y);
+                const minX = Math.min(...xValues);
+                const maxX = Math.max(...xValues);
+                const minY = Math.min(...yValues);
+                const maxY = Math.max(...yValues);
+                document.getElementById('rangeX').textContent = minX.toFixed(1) + ' ~ ' + maxX.toFixed(1);
+                document.getElementById('rangeY').textContent = minY.toFixed(1) + ' ~ ' + maxY.toFixed(1);
+            } else {
+                document.getElementById('rangeX').textContent = '-';
+                document.getElementById('rangeY').textContent = '-';
+            }
         }
 
         function drawChart() {
@@ -615,32 +518,25 @@
                 return;
             }
 
-            let minX = Math.min(...chartState.data.map(p => p.x));
-            let maxX = Math.max(...chartState.data.map(p => p.x));
-            let minY = Math.min(...chartState.data.map(p => p.y));
-            let maxY = Math.max(...chartState.data.map(p => p.y));
+            // Applica offset Y ai dati
+            const dataWithOffset = chartState.data.map(p => ({
+                x: p.x,
+                y: p.y + chartState.offsetY
+            }));
 
-            if (chartState.autoScaleX) {
-                const rangeX = maxX - minX;
-                minX -= rangeX * 0.1;
-                maxX += rangeX * 0.1;
-            } else {
-                const centerX = (minX + maxX) / 2;
-                const rangeX = (maxX - minX) / chartState.zoomX;
-                minX = centerX - rangeX / 2 - chartState.panX;
-                maxX = centerX + rangeX / 2 - chartState.panX;
-            }
+            let minX = Math.min(...dataWithOffset.map(p => p.x));
+            let maxX = Math.max(...dataWithOffset.map(p => p.x));
+            let minY = Math.min(...dataWithOffset.map(p => p.y));
+            let maxY = Math.max(...dataWithOffset.map(p => p.y));
 
-            if (chartState.autoScaleY) {
-                const rangeY = maxY - minY;
-                minY -= rangeY * 0.1;
-                maxY += rangeY * 0.1;
-            } else {
-                const centerY = (minY + maxY) / 2;
-                const rangeY = (maxY - minY) / chartState.zoomY;
-                minY = centerY - rangeY / 2 + chartState.panY;
-                maxY = centerY + rangeY / 2 + chartState.panY;
-            }
+            // AutoScale con margine 10%
+            const rangeX = maxX - minX;
+            minX -= rangeX * 0.1;
+            maxX += rangeX * 0.1;
+
+            const rangeY = maxY - minY;
+            minY -= rangeY * 0.1;
+            maxY += rangeY * 0.1;
 
             // Grid
             ctx.strokeStyle = '#2a3447';
@@ -697,7 +593,7 @@
             ctx.strokeStyle = '#00d4ff';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            chartState.data.forEach((point, index) => {
+            dataWithOffset.forEach((point, index) => {
                 const x = transformX(point.x);
                 const y = transformY(point.y);
                 if (index === 0) ctx.moveTo(x, y);
@@ -706,7 +602,7 @@
             ctx.stroke();
 
             // Points
-            chartState.data.forEach(point => {
+            dataWithOffset.forEach(point => {
                 const x = transformX(point.x);
                 const y = transformY(point.y);
 
@@ -737,50 +633,7 @@
             ctx.restore();
         }
 
-        // Mouse events
-        canvas.addEventListener('mousedown', (e) => {
-            chartState.isDragging = true;
-            chartState.lastMouseX = e.clientX;
-            chartState.lastMouseY = e.clientY;
-            canvas.style.cursor = 'grabbing';
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
-            if (chartState.isDragging) {
-                const deltaX = e.clientX - chartState.lastMouseX;
-                const deltaY = e.clientY - chartState.lastMouseY;
-
-                if (!chartState.autoScaleX) chartState.panX += deltaX * 0.5;
-                if (!chartState.autoScaleY) chartState.panY -= deltaY * 0.5;
-
-                chartState.lastMouseX = e.clientX;
-                chartState.lastMouseY = e.clientY;
-
-                updateUI();
-                drawChart();
-            }
-        });
-
-        canvas.addEventListener('mouseup', () => {
-            chartState.isDragging = false;
-            canvas.style.cursor = 'crosshair';
-        });
-
-        canvas.addEventListener('mouseleave', () => {
-            chartState.isDragging = false;
-            canvas.style.cursor = 'crosshair';
-        });
-
-        canvas.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-            if (e.shiftKey) zoomY(zoomFactor);
-            else zoomX(zoomFactor);
-        });
-
         // ===== DXF PARSING =====
-        const INTERPOLATION_STEP = 0.005;
-        const SCALE_FACTOR = 1000.0;
 
         function handleDXFUpload(event) {
             const file = event.target.files[0];
