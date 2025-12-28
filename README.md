@@ -1,6 +1,6 @@
-# XY Chart - DXF CSV Viewer
+# XY Chart - DXF Viewer
 
-Un widget web interattivo per visualizzare dati XY da file CSV, specificamente progettato per dati DXF.
+Un widget web interattivo per visualizzare dati XY da file DXF con parsing diretto nel browser, oppure tramite file CSV pre-generati.
 
 ## Struttura del Progetto
 
@@ -16,10 +16,17 @@ makor_dxf/
 
 ## Funzionalità
 
+### Caricamento Dati
+- **Upload DXF diretto**: Carica file DXF direttamente dal browser (parsing JavaScript)
+- **Supporto CSV**: Carica dati da file CSV pre-generati
+- **Parsing real-time**: Estrae punti da entità DXF (Spline, Line, Arc, Polyline)
+- **Interpolazione automatica**: Converte curve in punti discreti
+- **Fattore di scala**: Applica scala 1000x ai punti (configurabile)
+
 ### Visualizzazione
 - **Grafico XY interattivo** con rendering su canvas HTML5
-- **Auto-refresh** ogni 2 secondi per aggiornamenti in tempo reale
 - **Design moderno** con tema scuro e gradients cyan/blue
+- **Info dettagliate**: Mostra numero di punti, spline, linee e archi processati
 
 ### Controlli Zoom
 - **Zoom X**: Controlli indipendenti per l'asse X (pulsanti + slider)
@@ -49,8 +56,25 @@ makor_dxf/
 ### Aprire il Widget
 
 1. Apri il file `widget/index.html` in un browser web moderno (Chrome, Firefox, Edge, Safari)
-2. Il widget caricherà automaticamente i dati da `data/output.csv`
-3. I dati si aggiorneranno automaticamente ogni 2 secondi
+2. Scegli una delle due modalità di caricamento dati:
+
+#### Modalità 1: Upload File DXF (Raccomandato)
+1. Clicca sul pulsante **"📁 Carica File DXF"**
+2. Seleziona un file `.dxf` dal tuo computer
+3. Il widget parsarà automaticamente il file ed estrarrà i punti
+4. I dati verranno visualizzati immediatamente sul grafico
+
+**Entità DXF Supportate**:
+- SPLINE (con interpolazione)
+- LINE
+- ARC
+- LWPOLYLINE
+- POLYLINE
+
+#### Modalità 2: File CSV Pre-generato
+1. Posiziona il tuo file CSV in `data/output.csv`
+2. Clicca su **"🔄 Ricarica CSV"**
+3. (Opzionale) L'auto-refresh è disabilitato di default, decommentare nel codice se necessario
 
 ### Formato CSV
 
@@ -98,9 +122,24 @@ X,Y
 
 ## Personalizzazione
 
+### Parametri DXF Parser
+
+Nel file `widget/index.html`, linee ~781-782:
+
+```javascript
+const INTERPOLATION_STEP = 0.005;  // Precisione interpolazione (più basso = più punti)
+const SCALE_FACTOR = 1000.0;       // Fattore moltiplicativo per i punti
+```
+
+- **INTERPOLATION_STEP**: Distanza minima tra punti interpolati (default: 0.005)
+  - Valori più bassi = più punti = maggiore precisione
+  - Valori più alti = meno punti = processamento più veloce
+- **SCALE_FACTOR**: Moltiplica tutti i valori X e Y (default: 1000.0)
+  - Utile per convertire unità (es. mm → µm)
+
 ### Modifica Percorso CSV
 
-Nel file `widget/index.html`, linea ~425:
+Nel file `widget/index.html`, linea ~407:
 
 ```javascript
 fetch('../data/output.csv?' + new Date().getTime())
@@ -108,15 +147,17 @@ fetch('../data/output.csv?' + new Date().getTime())
 
 Cambiare il percorso per puntare a un diverso file CSV.
 
-### Modifica Frequenza Refresh
+### Abilita Auto-Refresh CSV
 
-Nel file `widget/index.html`, linea ~670:
+Nel file `widget/index.html`, linee ~1001-1004:
 
 ```javascript
-setInterval(loadCSVData, 2000);  // 2000ms = 2 secondi
-```
+// Decommentare per abilitare caricamento automatico CSV all'avvio
+// loadCSVData();
 
-Modificare il valore in millisecondi per cambiare la frequenza di aggiornamento.
+// Decommentare per abilitare auto-refresh ogni 2 secondi
+// setInterval(loadCSVData, 2000);
+```
 
 ### Personalizzazione Colori
 
@@ -154,6 +195,55 @@ php -S localhost:8000
 
 Quindi aprire `http://localhost:8000/widget/index.html`
 
+## Architettura DXF Parser
+
+### Traduzione da C# a JavaScript
+
+Il parser DXF JavaScript è una traduzione fedele dello script C# originale che utilizza la libreria `netDxf`. Ecco le equivalenze:
+
+| Funzionalità C# | Implementazione JavaScript |
+|----------------|----------------------------|
+| `netDxf.DxfDocument.Load()` | `dxf-parser` library (CDN) |
+| `InterpolateLine()` | Identica logica matematica |
+| `InterpolateArc()` | Identica logica con angoli |
+| `Spline.PolygonalVertexes()` | `controlPoints` + `fitPoints` |
+| `scaleFactor * 1000` | `SCALE_FACTOR` costante |
+| Export to CSV | `exportToCSV()` con Blob |
+
+### Flusso di Processamento
+
+```
+1. Upload file DXF
+   ↓
+2. FileReader legge come testo
+   ↓
+3. DxfParser.parseSync() crea oggetto DXF
+   ↓
+4. Itera su entities (SPLINE, LINE, ARC, POLYLINE)
+   ↓
+5. Interpola ogni entità in punti discreti
+   ↓
+6. Applica SCALE_FACTOR
+   ↓
+7. Popola chartState.data
+   ↓
+8. Renderizza su canvas
+```
+
+### Parametri Configurabili
+
+- **INTERPOLATION_STEP (0.005)**: Precisione interpolazione curve
+- **SCALE_FACTOR (1000.0)**: Moltiplicatore per conversione unità
+- **Parser precision**: Modificabile tramite `numSegments` in `interpolateLine()`
+
+### Export CSV
+
+Il parser genera automaticamente un CSV scaricabile. Per abilitare l'auto-download, decommentare in `exportToCSV()`:
+
+```javascript
+a.click();  // Auto-download del CSV generato
+```
+
 ## Licenza
 
 Progetto sviluppato per visualizzazione dati DXF.
@@ -161,3 +251,9 @@ Progetto sviluppato per visualizzazione dati DXF.
 ## Supporto
 
 Per problemi o domande, aprire una issue nel repository del progetto.
+
+## Credits
+
+- **DXF Parser**: [dxf-parser](https://github.com/gdsestimating/dxf-parser) by gdsestimating
+- **Font**: Google Fonts (Barlow, JetBrains Mono)
+- **Ispirazione**: Script C# originale con netDxf

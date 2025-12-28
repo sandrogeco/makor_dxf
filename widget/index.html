@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XY Chart - DXF CSV Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/dxf-parser@1.3.1/dist/dxf-parser.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -248,6 +249,49 @@
             font-weight: 500;
             color: var(--accent-cyan);
         }
+
+        .file-upload-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-upload-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-upload-label {
+            display: block;
+            width: 100%;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(0, 255, 170, 0.1));
+            border: 1px solid var(--accent-blue);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'Barlow', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-upload-label:hover {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 255, 170, 0.2));
+            border-color: var(--accent-cyan);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 212, 255, 0.3);
+        }
+
+        .file-name-display {
+            margin-top: 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+        }
     </style>
 </head>
 <body>
@@ -333,10 +377,17 @@
                 </button>
             </div>
 
-            <!-- Refresh -->
+            <!-- Upload DXF & Data -->
             <div class="control-group">
                 <h3>📊 Dati</h3>
-                <button class="control-btn full-width" onclick="loadCSVData()">
+                <div class="file-upload-wrapper">
+                    <input type="file" id="dxfFileInput" accept=".dxf" onchange="handleDXFUpload(event)">
+                    <label for="dxfFileInput" class="file-upload-label">
+                        📁 Carica File DXF
+                    </label>
+                </div>
+                <div class="file-name-display" id="fileName">Nessun file selezionato</div>
+                <button class="control-btn full-width" onclick="loadCSVData()" style="margin-top: 12px;">
                     <span>🔄 Ricarica CSV</span>
                 </button>
             </div>
@@ -726,13 +777,231 @@
             else zoomX(zoomFactor);
         });
 
+        // ===== DXF PARSING =====
+        const INTERPOLATION_STEP = 0.005;
+        const SCALE_FACTOR = 1000.0;
+
+        function handleDXFUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('connectionStatus').textContent = 'Caricamento DXF...';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const dxfString = e.target.result;
+                    parseDXF(dxfString, file.name);
+                } catch (error) {
+                    console.error('Errore lettura file:', error);
+                    document.getElementById('connectionStatus').textContent = 'ERRORE: ' + error.message;
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseDXF(dxfString, fileName) {
+            try {
+                console.log('=== PARSING DXF ===');
+                console.log('File:', fileName);
+                console.log('Passo interpolazione:', INTERPOLATION_STEP);
+                console.log('Fattore scala:', SCALE_FACTOR);
+
+                const parser = new window.DxfParser();
+                const dxf = parser.parseSync(dxfString);
+
+                if (!dxf || !dxf.entities) {
+                    throw new Error('DXF non valido o vuoto');
+                }
+
+                let xPoints = [];
+                let yPoints = [];
+                let splineCount = 0;
+                let lineCount = 0;
+                let arcCount = 0;
+
+                // Processa tutte le entità
+                dxf.entities.forEach(entity => {
+                    if (entity.type === 'SPLINE') {
+                        splineCount++;
+                        console.log('Processando Spline #' + splineCount);
+                        processSpline(entity, xPoints, yPoints);
+                    } else if (entity.type === 'LINE') {
+                        lineCount++;
+                        const start = entity.vertices[0];
+                        const end = entity.vertices[1];
+                        interpolateLine(start.x, start.y, end.x, end.y, xPoints, yPoints);
+                    } else if (entity.type === 'ARC') {
+                        arcCount++;
+                        interpolateArc(entity, xPoints, yPoints);
+                    } else if (entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') {
+                        // Interpola tra i vertici della polyline
+                        for (let i = 0; i < entity.vertices.length - 1; i++) {
+                            const v1 = entity.vertices[i];
+                            const v2 = entity.vertices[i + 1];
+                            interpolateLine(v1.x, v1.y, v2.x, v2.y, xPoints, yPoints);
+                        }
+                        // Se chiusa, collega ultimo a primo
+                        if (entity.shape && entity.vertices.length > 1) {
+                            const vLast = entity.vertices[entity.vertices.length - 1];
+                            const vFirst = entity.vertices[0];
+                            interpolateLine(vLast.x, vLast.y, vFirst.x, vFirst.y, xPoints, yPoints);
+                        }
+                    }
+                });
+
+                if (xPoints.length === 0) {
+                    throw new Error('Nessun punto estratto dal DXF');
+                }
+
+                console.log('Punti totali generati (prima della scala):', xPoints.length);
+                console.log('Splines:', splineCount, 'Lines:', lineCount, 'Arcs:', arcCount);
+
+                // Applica fattore di scala
+                for (let i = 0; i < xPoints.length; i++) {
+                    xPoints[i] *= SCALE_FACTOR;
+                    yPoints[i] *= SCALE_FACTOR;
+                }
+
+                // Converti in formato chartState.data
+                chartState.data = [];
+                for (let i = 0; i < xPoints.length; i++) {
+                    chartState.data.push({ x: xPoints[i], y: yPoints[i] });
+                }
+
+                // Calcola statistiche
+                const minX = Math.min(...xPoints);
+                const maxX = Math.max(...xPoints);
+                const minY = Math.min(...yPoints);
+                const maxY = Math.max(...yPoints);
+
+                const successMsg = `Caricati ${xPoints.length} punti (${splineCount} splines, ${lineCount} linee, ${arcCount} archi)`;
+                document.getElementById('connectionStatus').textContent = successMsg;
+
+                console.log('=== DXF CARICATO CON SUCCESSO ===');
+                console.log(successMsg);
+                console.log('Range X:', minX.toFixed(1), 'to', maxX.toFixed(1));
+                console.log('Range Y:', minY.toFixed(1), 'to', maxY.toFixed(1));
+
+                // Esporta CSV (opzionale)
+                exportToCSV(chartState.data);
+
+                updateUI();
+                drawChart();
+
+            } catch (error) {
+                console.error('Errore parsing DXF:', error);
+                document.getElementById('connectionStatus').textContent = 'ERRORE: ' + error.message;
+                chartState.data = [];
+                updateUI();
+                drawChart();
+            }
+        }
+
+        function processSpline(spline, xPoints, yPoints) {
+            // Le spline nel DXF parser hanno controlPoints
+            if (!spline.controlPoints || spline.controlPoints.length < 2) {
+                console.warn('Spline senza control points sufficienti');
+                return;
+            }
+
+            // Genera punti poligonali dalla spline
+            // Interpolazione semplificata: crea segmenti tra i control points
+            const points = spline.controlPoints;
+
+            // Se la spline ha fitPoints, usali invece
+            const interpolatePoints = spline.fitPoints && spline.fitPoints.length > 0
+                ? spline.fitPoints
+                : points;
+
+            // Interpola tra i punti
+            for (let i = 0; i < interpolatePoints.length - 1; i++) {
+                const p1 = interpolatePoints[i];
+                const p2 = interpolatePoints[i + 1];
+                interpolateLine(p1.x, p1.y, p2.x, p2.y, xPoints, yPoints);
+            }
+
+            // Se chiusa, collega ultimo a primo
+            if (spline.closed && interpolatePoints.length > 1) {
+                const p1 = interpolatePoints[interpolatePoints.length - 1];
+                const p2 = interpolatePoints[0];
+                interpolateLine(p1.x, p1.y, p2.x, p2.y, xPoints, yPoints);
+            }
+        }
+
+        function interpolateLine(x1, y1, x2, y2, xPoints, yPoints) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const length = Math.sqrt(dx * dx + dy * dy);
+
+            if (length < 0.0001) return;
+
+            const numSegments = Math.max(1, Math.floor(length / INTERPOLATION_STEP));
+
+            for (let i = 0; i <= numSegments; i++) {
+                const t = i / numSegments;
+                xPoints.push(x1 + dx * t);
+                yPoints.push(y1 + dy * t);
+            }
+        }
+
+        function interpolateArc(arc, xPoints, yPoints) {
+            let startAngle = arc.startAngle || 0;
+            let endAngle = arc.endAngle || 360;
+
+            // Normalizza angoli
+            while (endAngle < startAngle) endAngle += 360;
+
+            const angleRange = endAngle - startAngle;
+            const arcLength = arc.radius * (angleRange * Math.PI / 180.0);
+            const numSegments = Math.max(2, Math.floor(arcLength / INTERPOLATION_STEP));
+
+            for (let i = 0; i <= numSegments; i++) {
+                const t = i / numSegments;
+                const angle = startAngle + angleRange * t;
+                const angleRad = angle * Math.PI / 180.0;
+
+                const x = arc.center.x + arc.radius * Math.cos(angleRad);
+                const y = arc.center.y + arc.radius * Math.sin(angleRad);
+
+                xPoints.push(x);
+                yPoints.push(y);
+            }
+        }
+
+        function exportToCSV(data) {
+            try {
+                let csv = 'X,Y\n';
+                data.forEach(point => {
+                    csv += point.x.toFixed(6) + ',' + point.y.toFixed(6) + '\n';
+                });
+
+                // Crea blob e download
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'dxf_output.csv';
+                // Non fare auto-download, solo log
+                console.log('CSV generato (' + data.length + ' punti). Usa il link per scaricare.');
+
+                // Puoi decommentare per auto-download:
+                // a.click();
+                // window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Errore export CSV:', error);
+            }
+        }
+
         // Carica automaticamente all'avvio
         window.addEventListener('load', function() {
-            console.log('Widget caricato - Tentativo caricamento CSV...');
-            loadCSVData();
+            console.log('Widget caricato - Pronto per upload DXF o caricamento CSV');
+            // Commenta l'auto-load CSV se vuoi solo upload DXF
+            // loadCSVData();
 
-            // Auto-refresh ogni 2 secondi
-            setInterval(loadCSVData, 2000);
+            // Commenta l'auto-refresh se vuoi solo upload manuale
+            // setInterval(loadCSVData, 2000);
         });
     </script>
 </body>
