@@ -598,6 +598,8 @@
         }
 
         function drawChart() {
+            console.log('drawChart() chiamato. Punti disponibili:', chartState.data.length);
+
             const rect = canvas.getBoundingClientRect();
             const width = rect.width;
             const height = rect.height;
@@ -610,7 +612,7 @@
                 ctx.font = '16px Barlow';
                 ctx.textAlign = 'center';
                 ctx.fillText('Nessun dato disponibile.', width / 2, height / 2 - 10);
-                ctx.fillText('Carica un file DXF e clicca "Ricarica CSV"', width / 2, height / 2 + 15);
+                ctx.fillText('Carica un file DXF o CSV', width / 2, height / 2 + 15);
                 return;
             }
 
@@ -805,58 +807,94 @@
             try {
                 console.log('=== PARSING DXF ===');
                 console.log('File:', fileName);
+                console.log('Dimensione file:', dxfString.length, 'caratteri');
                 console.log('Passo interpolazione:', INTERPOLATION_STEP);
                 console.log('Fattore scala:', SCALE_FACTOR);
+
+                // Verifica se DxfParser è disponibile
+                if (!window.DxfParser) {
+                    throw new Error('Libreria DxfParser non caricata. Controlla la connessione internet.');
+                }
 
                 const parser = new window.DxfParser();
                 const dxf = parser.parseSync(dxfString);
 
+                console.log('DXF parsato:', dxf);
+                console.log('Entità trovate:', dxf.entities ? dxf.entities.length : 0);
+
                 if (!dxf || !dxf.entities) {
                     throw new Error('DXF non valido o vuoto');
                 }
+
+                // Log dei tipi di entità presenti
+                const entityTypes = {};
+                dxf.entities.forEach(entity => {
+                    entityTypes[entity.type] = (entityTypes[entity.type] || 0) + 1;
+                });
+                console.log('Tipi di entità nel DXF:', entityTypes);
 
                 let xPoints = [];
                 let yPoints = [];
                 let splineCount = 0;
                 let lineCount = 0;
                 let arcCount = 0;
+                let polylineCount = 0;
+                let ignoredCount = 0;
 
                 // Processa tutte le entità
                 dxf.entities.forEach(entity => {
+                    console.log('Processando entità tipo:', entity.type);
+
                     if (entity.type === 'SPLINE') {
                         splineCount++;
-                        console.log('Processando Spline #' + splineCount);
+                        console.log('Processando Spline #' + splineCount, entity);
                         processSpline(entity, xPoints, yPoints);
                     } else if (entity.type === 'LINE') {
                         lineCount++;
-                        const start = entity.vertices[0];
-                        const end = entity.vertices[1];
-                        interpolateLine(start.x, start.y, end.x, end.y, xPoints, yPoints);
+                        console.log('Processando Line #' + lineCount, entity);
+                        // LINE ha startPoint e endPoint, non vertices
+                        const start = entity.vertices ? entity.vertices[0] : entity.startPoint;
+                        const end = entity.vertices ? entity.vertices[1] : entity.endPoint;
+                        if (start && end) {
+                            interpolateLine(start.x, start.y, end.x, end.y, xPoints, yPoints);
+                        } else {
+                            console.warn('Line senza punti validi:', entity);
+                        }
                     } else if (entity.type === 'ARC') {
                         arcCount++;
+                        console.log('Processando Arc #' + arcCount, entity);
                         interpolateArc(entity, xPoints, yPoints);
                     } else if (entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') {
+                        polylineCount++;
+                        console.log('Processando Polyline #' + polylineCount, entity);
                         // Interpola tra i vertici della polyline
-                        for (let i = 0; i < entity.vertices.length - 1; i++) {
-                            const v1 = entity.vertices[i];
-                            const v2 = entity.vertices[i + 1];
-                            interpolateLine(v1.x, v1.y, v2.x, v2.y, xPoints, yPoints);
+                        if (entity.vertices && entity.vertices.length > 1) {
+                            for (let i = 0; i < entity.vertices.length - 1; i++) {
+                                const v1 = entity.vertices[i];
+                                const v2 = entity.vertices[i + 1];
+                                interpolateLine(v1.x, v1.y, v2.x, v2.y, xPoints, yPoints);
+                            }
+                            // Se chiusa, collega ultimo a primo
+                            if (entity.shape && entity.vertices.length > 1) {
+                                const vLast = entity.vertices[entity.vertices.length - 1];
+                                const vFirst = entity.vertices[0];
+                                interpolateLine(vLast.x, vLast.y, vFirst.x, vFirst.y, xPoints, yPoints);
+                            }
                         }
-                        // Se chiusa, collega ultimo a primo
-                        if (entity.shape && entity.vertices.length > 1) {
-                            const vLast = entity.vertices[entity.vertices.length - 1];
-                            const vFirst = entity.vertices[0];
-                            interpolateLine(vLast.x, vLast.y, vFirst.x, vFirst.y, xPoints, yPoints);
-                        }
+                    } else {
+                        ignoredCount++;
+                        console.log('Entità ignorata:', entity.type);
                     }
                 });
 
-                if (xPoints.length === 0) {
-                    throw new Error('Nessun punto estratto dal DXF');
-                }
-
                 console.log('Punti totali generati (prima della scala):', xPoints.length);
-                console.log('Splines:', splineCount, 'Lines:', lineCount, 'Arcs:', arcCount);
+                console.log('Splines:', splineCount, 'Lines:', lineCount, 'Arcs:', arcCount, 'Polylines:', polylineCount, 'Ignorati:', ignoredCount);
+
+                if (xPoints.length === 0) {
+                    const errorMsg = `DXF processato ma nessun punto estratto. Entità trovate: ${dxf.entities.length}. Controllare console per dettagli.`;
+                    document.getElementById('connectionStatus').textContent = errorMsg;
+                    throw new Error(errorMsg);
+                }
 
                 // Applica fattore di scala
                 for (let i = 0; i < xPoints.length; i++) {
@@ -864,11 +902,18 @@
                     yPoints[i] *= SCALE_FACTOR;
                 }
 
+                console.log('Scala applicata. Range prima della conversione in chartState.data');
+                console.log('X:', Math.min(...xPoints).toFixed(2), 'to', Math.max(...xPoints).toFixed(2));
+                console.log('Y:', Math.min(...yPoints).toFixed(2), 'to', Math.max(...yPoints).toFixed(2));
+
                 // Converti in formato chartState.data
                 chartState.data = [];
                 for (let i = 0; i < xPoints.length; i++) {
                     chartState.data.push({ x: xPoints[i], y: yPoints[i] });
                 }
+
+                console.log('chartState.data popolato con', chartState.data.length, 'punti');
+                console.log('Primi 3 punti:', chartState.data.slice(0, 3));
 
                 // Calcola statistiche
                 const minX = Math.min(...xPoints);
@@ -876,7 +921,14 @@
                 const minY = Math.min(...yPoints);
                 const maxY = Math.max(...yPoints);
 
-                const successMsg = `Caricati ${xPoints.length} punti (${splineCount} splines, ${lineCount} linee, ${arcCount} archi)`;
+                let successMsg = `Caricati ${xPoints.length} punti`;
+                const parts = [];
+                if (splineCount > 0) parts.push(`${splineCount} splines`);
+                if (lineCount > 0) parts.push(`${lineCount} linee`);
+                if (arcCount > 0) parts.push(`${arcCount} archi`);
+                if (polylineCount > 0) parts.push(`${polylineCount} polylines`);
+                if (parts.length > 0) successMsg += ` (${parts.join(', ')})`;
+
                 document.getElementById('connectionStatus').textContent = successMsg;
 
                 console.log('=== DXF CARICATO CON SUCCESSO ===');
@@ -900,20 +952,33 @@
         }
 
         function processSpline(spline, xPoints, yPoints) {
+            console.log('processSpline chiamato con:', spline);
+            console.log('  controlPoints:', spline.controlPoints ? spline.controlPoints.length : 'N/A');
+            console.log('  fitPoints:', spline.fitPoints ? spline.fitPoints.length : 'N/A');
+            console.log('  closed:', spline.closed);
+
             // Le spline nel DXF parser hanno controlPoints
             if (!spline.controlPoints || spline.controlPoints.length < 2) {
-                console.warn('Spline senza control points sufficienti');
-                return;
+                // Prova anche fitPoints
+                if (!spline.fitPoints || spline.fitPoints.length < 2) {
+                    console.warn('Spline senza control points o fit points sufficienti:', spline);
+                    return;
+                }
             }
 
             // Genera punti poligonali dalla spline
             // Interpolazione semplificata: crea segmenti tra i control points
-            const points = spline.controlPoints;
+            const points = spline.controlPoints || [];
 
             // Se la spline ha fitPoints, usali invece
             const interpolatePoints = spline.fitPoints && spline.fitPoints.length > 0
                 ? spline.fitPoints
                 : points;
+
+            console.log('  Usando', interpolatePoints.length, 'punti per interpolazione');
+            console.log('  Primi 2 punti:', interpolatePoints.slice(0, 2));
+
+            const startLength = xPoints.length;
 
             // Interpola tra i punti
             for (let i = 0; i < interpolatePoints.length - 1; i++) {
@@ -928,6 +993,9 @@
                 const p2 = interpolatePoints[0];
                 interpolateLine(p1.x, p1.y, p2.x, p2.y, xPoints, yPoints);
             }
+
+            const addedPoints = xPoints.length - startLength;
+            console.log('  Spline processata. Punti aggiunti:', addedPoints);
         }
 
         function interpolateLine(x1, y1, x2, y2, xPoints, yPoints) {
