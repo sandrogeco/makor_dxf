@@ -360,6 +360,23 @@
                 </div>
             </div>
 
+            <!-- Zoom X -->
+            <div class="control-group">
+                <h3>🔍 Zoom Asse X</h3>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Livello Zoom</span>
+                        <span class="slider-value" id="zoomXValue">100%</span>
+                    </div>
+                    <input type="range" id="zoomXSlider" min="10" max="500" value="100" step="10"
+                           oninput="setZoomX(this.value)"
+                           style="width: 100%;">
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+                    10% = zoom out, 500% = zoom in
+                </div>
+            </div>
+
             <!-- Linee Verticali -->
             <div class="control-group">
                 <h3>📏 Linee Verticali</h3>
@@ -368,7 +385,7 @@
                         <span>Linea 1 (X)</span>
                         <span class="slider-value" id="line1Value">0</span>
                     </div>
-                    <input type="number" id="line1Input" value="0" step="10"
+                    <input type="number" id="line1Input" value="0" step="0.005"
                            oninput="setLine1X(this.value)"
                            style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">
                 </div>
@@ -377,7 +394,7 @@
                         <span>Linea 2 (X)</span>
                         <span class="slider-value" id="line2Value">100</span>
                     </div>
-                    <input type="number" id="line2Input" value="100" step="10"
+                    <input type="number" id="line2Input" value="100" step="0.005"
                            oninput="setLine2X(this.value)"
                            style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">
                 </div>
@@ -416,15 +433,18 @@
             data: [],
             offsetY: 0,
             line1X: 0,
-            line2X: 100
+            line2X: 100,
+            zoomX: 1.0  // 1.0 = 100% (nessun zoom)
         };
 
         let INTERPOLATION_STEP = 0.005;
         const SCALE_FACTOR = 1000.0;
 
-        // Salva l'ultimo DXF caricato per refresh automatico
+        // Salva l'ultimo file caricato per refresh automatico
         let lastDxfString = null;
         let lastDxfFileName = null;
+        let lastCsvData = null;  // Per CSV
+        let lastLoadType = null; // 'dxf' o 'csv'
 
         // Stato per drag delle linee verticali
         let isDraggingLine = null; // 'line1' o 'line2'
@@ -469,6 +489,13 @@
         }
 
         function parseCSV(csvText) {
+            // Salva per refresh automatico
+            lastCsvData = csvText;
+            lastLoadType = 'csv';
+            applyCSVData(csvText);
+        }
+
+        function applyCSVData(csvText) {
             const lines = csvText.trim().split('\n');
             chartState.data = [];
 
@@ -496,36 +523,42 @@
         }
 
         // ===== CONTROLLI =====
-        function setOffsetY(value) {
-            chartState.offsetY = parseFloat(value) || 0;
-            updateUI();
-            // Ricarica DXF se disponibile
-            if (lastDxfString) {
+        function reloadLastFile() {
+            if (lastLoadType === 'dxf' && lastDxfString) {
                 parseDXF(lastDxfString, lastDxfFileName);
+            } else if (lastLoadType === 'csv' && lastCsvData) {
+                applyCSVData(lastCsvData);
             } else {
                 drawChart();
             }
+        }
+
+        function setOffsetY(value) {
+            chartState.offsetY = parseFloat(value) || 0;
+            updateUI();
+            reloadLastFile();
         }
 
         function resetOffset() {
             chartState.offsetY = 0;
             document.getElementById('offsetYInput').value = 0;
             updateUI();
-            // Ricarica DXF se disponibile
-            if (lastDxfString) {
-                parseDXF(lastDxfString, lastDxfFileName);
-            } else {
-                drawChart();
-            }
+            reloadLastFile();
         }
 
         function setInterpolationStep(value) {
             INTERPOLATION_STEP = parseFloat(value) || 0.005;
+            // Aggiorna step delle linee verticali
+            document.getElementById('line1Input').step = INTERPOLATION_STEP;
+            document.getElementById('line2Input').step = INTERPOLATION_STEP;
             updateUI();
-            // Ricarica DXF se disponibile
-            if (lastDxfString) {
-                parseDXF(lastDxfString, lastDxfFileName);
-            }
+            reloadLastFile();
+        }
+
+        function setZoomX(value) {
+            chartState.zoomX = parseFloat(value) / 100.0;  // Converti percentuale a fattore
+            updateUI();
+            drawChart();
         }
 
         function setLine1X(value) {
@@ -546,6 +579,7 @@
             document.getElementById('currentOffsetY').textContent = chartState.offsetY.toFixed(0);
             document.getElementById('interpolationValue').textContent = INTERPOLATION_STEP.toFixed(3);
             document.getElementById('currentInterpolation').textContent = INTERPOLATION_STEP.toFixed(3);
+            document.getElementById('zoomXValue').textContent = (chartState.zoomX * 100).toFixed(0) + '%';
             document.getElementById('line1Value').textContent = chartState.line1X.toFixed(0);
             document.getElementById('line2Value').textContent = chartState.line2X.toFixed(0);
 
@@ -592,16 +626,23 @@
 
             let minX = Math.min(...dataWithOffset.map(p => p.x));
             let maxX = Math.max(...dataWithOffset.map(p => p.x));
+            let minY = Math.min(...dataWithOffset.map(p => p.y));
             let maxY = Math.max(...dataWithOffset.map(p => p.y));
 
-            // AutoScale X con margine 10%
+            // AutoScale X con margine 10% e zoom
             const rangeX = maxX - minX;
-            minX -= rangeX * 0.1;
-            maxX += rangeX * 0.1;
+            const centerX = (minX + maxX) / 2;
+            const zoomedRangeX = rangeX / chartState.zoomX;  // Zoom in = range più piccolo
+            minX = centerX - zoomedRangeX / 2;
+            maxX = centerX + zoomedRangeX / 2;
+            // Aggiungi margine 10%
+            const marginX = (maxX - minX) * 0.1;
+            minX -= marginX;
+            maxX += marginX;
 
-            // Asse Y bloccato da 0 a max(y) + 15%
-            let minY = 0;
-            maxY = maxY * 1.15;
+            // Asse Y: parte da minY o 0 (il più piccolo), fino a maxY + 15%
+            if (minY > 0) minY = 0;  // Se tutti i dati sono positivi, parte da 0
+            maxY = maxY + (maxY - minY) * 0.15;  // +15% del range
 
             // Grid
             ctx.strokeStyle = '#2a3447';
@@ -750,6 +791,7 @@
                     // Salva per refresh automatico
                     lastDxfString = dxfString;
                     lastDxfFileName = file.name;
+                    lastLoadType = 'dxf';
                     parseDXF(dxfString, file.name);
                 } catch (error) {
                     console.error('Errore lettura file:', error);
