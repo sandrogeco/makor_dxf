@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XY Chart - DXF CSV Viewer</title>
-    <script src="https://cdn.jsdelivr.net/npm/dxf-parser@1.3.1/dist/dxf-parser.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -803,26 +802,68 @@
             reader.readAsText(file);
         }
 
+        // ===== PARSER DXF NATIVO =====
+        function parseDXFNative(dxfString) {
+            const lines = dxfString.split('\n').map(l => l.trim());
+            const entities = [];
+            let currentEntity = null;
+            let inEntitiesSection = false;
+            let groupCode = null;
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+
+                // Rileva sezione ENTITIES
+                if (line === 'ENTITIES') {
+                    inEntitiesSection = true;
+                    continue;
+                }
+                if (line === 'ENDSEC' && inEntitiesSection) {
+                    if (currentEntity) entities.push(currentEntity);
+                    break;
+                }
+
+                if (!inEntitiesSection) continue;
+
+                // Group code (numero)
+                if (i % 2 === 0) {
+                    groupCode = parseInt(line);
+                } else {
+                    // Value
+                    const value = line;
+
+                    if (groupCode === 0) {
+                        // Nuovo entity
+                        if (currentEntity) entities.push(currentEntity);
+                        currentEntity = { type: value, data: {} };
+                    } else if (currentEntity) {
+                        // Store data by group code
+                        if (!currentEntity.data[groupCode]) {
+                            currentEntity.data[groupCode] = [];
+                        }
+                        currentEntity.data[groupCode].push(value);
+                    }
+                }
+            }
+
+            console.log('Parser nativo: trovate', entities.length, 'entità');
+            return { entities: entities };
+        }
+
         function parseDXF(dxfString, fileName) {
             try {
-                console.log('=== PARSING DXF ===');
+                console.log('=== PARSING DXF (Parser Nativo) ===');
                 console.log('File:', fileName);
                 console.log('Dimensione file:', dxfString.length, 'caratteri');
                 console.log('Passo interpolazione:', INTERPOLATION_STEP);
                 console.log('Fattore scala:', SCALE_FACTOR);
 
-                // Verifica se DxfParser è disponibile
-                if (!window.DxfParser) {
-                    throw new Error('Libreria DxfParser non caricata. Controlla la connessione internet.');
-                }
+                const dxf = parseDXFNative(dxfString);
 
-                const parser = new window.DxfParser();
-                const dxf = parser.parseSync(dxfString);
-
-                console.log('DXF parsato:', dxf);
+                console.log('DXF parsato');
                 console.log('Entità trovate:', dxf.entities ? dxf.entities.length : 0);
 
-                if (!dxf || !dxf.entities) {
+                if (!dxf || !dxf.entities || dxf.entities.length === 0) {
                     throw new Error('DXF non valido o vuoto');
                 }
 
@@ -848,39 +889,19 @@
                     if (entity.type === 'SPLINE') {
                         splineCount++;
                         console.log('Processando Spline #' + splineCount, entity);
-                        processSpline(entity, xPoints, yPoints);
+                        processSplineNative(entity, xPoints, yPoints);
                     } else if (entity.type === 'LINE') {
                         lineCount++;
                         console.log('Processando Line #' + lineCount, entity);
-                        // LINE ha startPoint e endPoint, non vertices
-                        const start = entity.vertices ? entity.vertices[0] : entity.startPoint;
-                        const end = entity.vertices ? entity.vertices[1] : entity.endPoint;
-                        if (start && end) {
-                            interpolateLine(start.x, start.y, end.x, end.y, xPoints, yPoints);
-                        } else {
-                            console.warn('Line senza punti validi:', entity);
-                        }
+                        processLineNative(entity, xPoints, yPoints);
                     } else if (entity.type === 'ARC') {
                         arcCount++;
                         console.log('Processando Arc #' + arcCount, entity);
-                        interpolateArc(entity, xPoints, yPoints);
+                        processArcNative(entity, xPoints, yPoints);
                     } else if (entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') {
                         polylineCount++;
                         console.log('Processando Polyline #' + polylineCount, entity);
-                        // Interpola tra i vertici della polyline
-                        if (entity.vertices && entity.vertices.length > 1) {
-                            for (let i = 0; i < entity.vertices.length - 1; i++) {
-                                const v1 = entity.vertices[i];
-                                const v2 = entity.vertices[i + 1];
-                                interpolateLine(v1.x, v1.y, v2.x, v2.y, xPoints, yPoints);
-                            }
-                            // Se chiusa, collega ultimo a primo
-                            if (entity.shape && entity.vertices.length > 1) {
-                                const vLast = entity.vertices[entity.vertices.length - 1];
-                                const vFirst = entity.vertices[0];
-                                interpolateLine(vLast.x, vLast.y, vFirst.x, vFirst.y, xPoints, yPoints);
-                            }
-                        }
+                        processPolylineNative(entity, xPoints, yPoints);
                     } else {
                         ignoredCount++;
                         console.log('Entità ignorata:', entity.type);
@@ -951,6 +972,107 @@
             }
         }
 
+        // ===== FUNZIONI DI PROCESSAMENTO PER PARSER NATIVO =====
+        function processLineNative(entity, xPoints, yPoints) {
+            // LINE: group codes 10,20 (start), 11,21 (end)
+            const x1 = entity.data[10] ? parseFloat(entity.data[10][0]) : 0;
+            const y1 = entity.data[20] ? parseFloat(entity.data[20][0]) : 0;
+            const x2 = entity.data[11] ? parseFloat(entity.data[11][0]) : 0;
+            const y2 = entity.data[21] ? parseFloat(entity.data[21][0]) : 0;
+
+            console.log('  LINE da (' + x1 + ',' + y1 + ') a (' + x2 + ',' + y2 + ')');
+            interpolateLine(x1, y1, x2, y2, xPoints, yPoints);
+        }
+
+        function processArcNative(entity, xPoints, yPoints) {
+            // ARC: 10,20 (center), 40 (radius), 50 (start angle), 51 (end angle)
+            const cx = entity.data[10] ? parseFloat(entity.data[10][0]) : 0;
+            const cy = entity.data[20] ? parseFloat(entity.data[20][0]) : 0;
+            const radius = entity.data[40] ? parseFloat(entity.data[40][0]) : 0;
+            const startAngle = entity.data[50] ? parseFloat(entity.data[50][0]) : 0;
+            const endAngle = entity.data[51] ? parseFloat(entity.data[51][0]) : 360;
+
+            console.log('  ARC centro (' + cx + ',' + cy + ') raggio ' + radius + ' angoli ' + startAngle + '-' + endAngle);
+
+            const arc = {
+                center: { x: cx, y: cy },
+                radius: radius,
+                startAngle: startAngle,
+                endAngle: endAngle
+            };
+            interpolateArc(arc, xPoints, yPoints);
+        }
+
+        function processPolylineNative(entity, xPoints, yPoints) {
+            // LWPOLYLINE/POLYLINE: group codes 10,20 per ogni vertice
+            const xs = entity.data[10] || [];
+            const ys = entity.data[20] || [];
+            const closed = entity.data[70] && parseInt(entity.data[70][0]) & 1;
+
+            console.log('  POLYLINE con ' + xs.length + ' vertici, closed=' + closed);
+
+            for (let i = 0; i < xs.length - 1; i++) {
+                const x1 = parseFloat(xs[i]);
+                const y1 = parseFloat(ys[i]);
+                const x2 = parseFloat(xs[i + 1]);
+                const y2 = parseFloat(ys[i + 1]);
+                interpolateLine(x1, y1, x2, y2, xPoints, yPoints);
+            }
+
+            // Se chiusa, collega ultimo a primo
+            if (closed && xs.length > 1) {
+                const x1 = parseFloat(xs[xs.length - 1]);
+                const y1 = parseFloat(ys[ys.length - 1]);
+                const x2 = parseFloat(xs[0]);
+                const y2 = parseFloat(ys[0]);
+                interpolateLine(x1, y1, x2, y2, xPoints, yPoints);
+            }
+        }
+
+        function processSplineNative(entity, xPoints, yPoints) {
+            // SPLINE: control points in 10,20,30
+            // Fit points in 11,21,31
+            const controlX = entity.data[10] || [];
+            const controlY = entity.data[20] || [];
+            const fitX = entity.data[11] || [];
+            const fitY = entity.data[21] || [];
+            const closed = entity.data[70] && parseInt(entity.data[70][0]) & 1;
+
+            // Usa fit points se disponibili, altrimenti control points
+            const xs = fitX.length > 0 ? fitX : controlX;
+            const ys = fitY.length > 0 ? fitY : controlY;
+
+            console.log('  SPLINE con ' + xs.length + ' punti, closed=' + closed);
+
+            if (xs.length < 2) {
+                console.warn('  SPLINE senza punti sufficienti');
+                return;
+            }
+
+            const startLength = xPoints.length;
+
+            for (let i = 0; i < xs.length - 1; i++) {
+                const x1 = parseFloat(xs[i]);
+                const y1 = parseFloat(ys[i]);
+                const x2 = parseFloat(xs[i + 1]);
+                const y2 = parseFloat(ys[i + 1]);
+                interpolateLine(x1, y1, x2, y2, xPoints, yPoints);
+            }
+
+            // Se chiusa, collega ultimo a primo
+            if (closed && xs.length > 1) {
+                const x1 = parseFloat(xs[xs.length - 1]);
+                const y1 = parseFloat(ys[ys.length - 1]);
+                const x2 = parseFloat(xs[0]);
+                const y2 = parseFloat(ys[0]);
+                interpolateLine(x1, y1, x2, y2, xPoints, yPoints);
+            }
+
+            const addedPoints = xPoints.length - startLength;
+            console.log('  SPLINE processata. Punti aggiunti:', addedPoints);
+        }
+
+        // ===== FUNZIONI LEGACY (NON PIÙ USATE) =====
         function processSpline(spline, xPoints, yPoints) {
             console.log('processSpline chiamato con:', spline);
             console.log('  controlPoints:', spline.controlPoints ? spline.controlPoints.length : 'N/A');
