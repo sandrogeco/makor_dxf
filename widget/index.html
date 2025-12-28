@@ -359,6 +359,32 @@
                     Più basso = più punti (ricarica DXF dopo modifica)
                 </div>
             </div>
+
+            <!-- Linee Verticali -->
+            <div class="control-group">
+                <h3>📏 Linee Verticali</h3>
+                <div class="slider-container" style="margin-bottom: 8px;">
+                    <div class="slider-label">
+                        <span>Linea 1 (X)</span>
+                        <span class="slider-value" id="line1Value">0</span>
+                    </div>
+                    <input type="number" id="line1Input" value="0" step="10"
+                           oninput="setLine1X(this.value)"
+                           style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Linea 2 (X)</span>
+                        <span class="slider-value" id="line2Value">100</span>
+                    </div>
+                    <input type="number" id="line2Input" value="100" step="10"
+                           oninput="setLine2X(this.value)"
+                           style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+                    Trascina le linee sul grafico per spostarle
+                </div>
+            </div>
         </div>
 
         <div class="info-panel">
@@ -388,11 +414,20 @@
     <script>
         let chartState = {
             data: [],
-            offsetY: 0
+            offsetY: 0,
+            line1X: 0,
+            line2X: 100
         };
 
         let INTERPOLATION_STEP = 0.005;
         const SCALE_FACTOR = 1000.0;
+
+        // Salva l'ultimo DXF caricato per refresh automatico
+        let lastDxfString = null;
+        let lastDxfFileName = null;
+
+        // Stato per drag delle linee verticali
+        let isDraggingLine = null; // 'line1' o 'line2'
 
         const canvas = document.getElementById('chartCanvas');
         const ctx = canvas.getContext('2d');
@@ -464,19 +499,45 @@
         function setOffsetY(value) {
             chartState.offsetY = parseFloat(value) || 0;
             updateUI();
-            drawChart();
+            // Ricarica DXF se disponibile
+            if (lastDxfString) {
+                parseDXF(lastDxfString, lastDxfFileName);
+            } else {
+                drawChart();
+            }
         }
 
         function resetOffset() {
             chartState.offsetY = 0;
             document.getElementById('offsetYInput').value = 0;
             updateUI();
-            drawChart();
+            // Ricarica DXF se disponibile
+            if (lastDxfString) {
+                parseDXF(lastDxfString, lastDxfFileName);
+            } else {
+                drawChart();
+            }
         }
 
         function setInterpolationStep(value) {
             INTERPOLATION_STEP = parseFloat(value) || 0.005;
             updateUI();
+            // Ricarica DXF se disponibile
+            if (lastDxfString) {
+                parseDXF(lastDxfString, lastDxfFileName);
+            }
+        }
+
+        function setLine1X(value) {
+            chartState.line1X = parseFloat(value) || 0;
+            updateUI();
+            drawChart();
+        }
+
+        function setLine2X(value) {
+            chartState.line2X = parseFloat(value) || 0;
+            updateUI();
+            drawChart();
         }
 
         function updateUI() {
@@ -485,6 +546,8 @@
             document.getElementById('currentOffsetY').textContent = chartState.offsetY.toFixed(0);
             document.getElementById('interpolationValue').textContent = INTERPOLATION_STEP.toFixed(3);
             document.getElementById('currentInterpolation').textContent = INTERPOLATION_STEP.toFixed(3);
+            document.getElementById('line1Value').textContent = chartState.line1X.toFixed(0);
+            document.getElementById('line2Value').textContent = chartState.line2X.toFixed(0);
 
             // Calcola range se ci sono dati
             if (chartState.data.length > 0) {
@@ -529,17 +592,16 @@
 
             let minX = Math.min(...dataWithOffset.map(p => p.x));
             let maxX = Math.max(...dataWithOffset.map(p => p.x));
-            let minY = Math.min(...dataWithOffset.map(p => p.y));
             let maxY = Math.max(...dataWithOffset.map(p => p.y));
 
-            // AutoScale con margine 10%
+            // AutoScale X con margine 10%
             const rangeX = maxX - minX;
             minX -= rangeX * 0.1;
             maxX += rangeX * 0.1;
 
-            const rangeY = maxY - minY;
-            minY -= rangeY * 0.1;
-            maxY += rangeY * 0.1;
+            // Asse Y bloccato da 0 a max(y) + 15%
+            let minY = 0;
+            maxY = maxY * 1.15;
 
             // Grid
             ctx.strokeStyle = '#2a3447';
@@ -634,6 +696,42 @@
             ctx.rotate(-Math.PI / 2);
             ctx.fillText('Asse Y', 0, 0);
             ctx.restore();
+
+            // Disegna linee verticali
+            const line1ScreenX = transformX(chartState.line1X);
+            const line2ScreenX = transformX(chartState.line2X);
+
+            // Linea 1 (rosso)
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(line1ScreenX, padding);
+            ctx.lineTo(line1ScreenX, height - padding);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Label Linea 1
+            ctx.fillStyle = '#ff4444';
+            ctx.font = '11px JetBrains Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText('L1: ' + chartState.line1X.toFixed(1), line1ScreenX + 5, padding + 15);
+
+            // Linea 2 (verde)
+            ctx.strokeStyle = '#44ff44';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(line2ScreenX, padding);
+            ctx.lineTo(line2ScreenX, height - padding);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Label Linea 2
+            ctx.fillStyle = '#44ff44';
+            ctx.font = '11px JetBrains Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText('L2: ' + chartState.line2X.toFixed(1), line2ScreenX + 5, padding + 30);
         }
 
         // ===== DXF PARSING =====
@@ -649,6 +747,9 @@
             reader.onload = function(e) {
                 try {
                     const dxfString = e.target.result;
+                    // Salva per refresh automatico
+                    lastDxfString = dxfString;
+                    lastDxfFileName = file.name;
                     parseDXF(dxfString, file.name);
                 } catch (error) {
                     console.error('Errore lettura file:', error);
@@ -1140,6 +1241,98 @@
             // Ora non fa nulla, l'export è manuale tramite pulsante
             console.log('CSV pronto per l\'export (' + data.length + ' punti). Usa il pulsante "Esporta CSV".');
         }
+
+        // ===== MOUSE DRAG PER LINEE VERTICALI =====
+        canvas.addEventListener('mousedown', function(e) {
+            if (chartState.data.length === 0) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const padding = 60;
+            const width = rect.width;
+
+            // Calcola posizioni linee sullo schermo
+            const dataWithOffset = chartState.data.map(p => ({ x: p.x, y: p.y + chartState.offsetY }));
+            let minX = Math.min(...dataWithOffset.map(p => p.x));
+            let maxX = Math.max(...dataWithOffset.map(p => p.x));
+            const rangeX = maxX - minX;
+            minX -= rangeX * 0.1;
+            maxX += rangeX * 0.1;
+
+            const transformX = (x) => padding + (width - 2 * padding) * ((x - minX) / (maxX - minX));
+            const line1ScreenX = transformX(chartState.line1X);
+            const line2ScreenX = transformX(chartState.line2X);
+
+            // Verifica se il click è vicino a una linea (tolleranza 10px)
+            if (Math.abs(mouseX - line1ScreenX) < 10) {
+                isDraggingLine = 'line1';
+                canvas.style.cursor = 'ew-resize';
+            } else if (Math.abs(mouseX - line2ScreenX) < 10) {
+                isDraggingLine = 'line2';
+                canvas.style.cursor = 'ew-resize';
+            }
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            if (chartState.data.length === 0) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const padding = 60;
+            const width = rect.width;
+
+            if (isDraggingLine) {
+                // Calcola valore X dai dati
+                const dataWithOffset = chartState.data.map(p => ({ x: p.x, y: p.y + chartState.offsetY }));
+                let minX = Math.min(...dataWithOffset.map(p => p.x));
+                let maxX = Math.max(...dataWithOffset.map(p => p.x));
+                const rangeX = maxX - minX;
+                minX -= rangeX * 0.1;
+                maxX += rangeX * 0.1;
+
+                const dataX = minX + (maxX - minX) * ((mouseX - padding) / (width - 2 * padding));
+
+                if (isDraggingLine === 'line1') {
+                    chartState.line1X = dataX;
+                    document.getElementById('line1Input').value = dataX.toFixed(0);
+                } else if (isDraggingLine === 'line2') {
+                    chartState.line2X = dataX;
+                    document.getElementById('line2Input').value = dataX.toFixed(0);
+                }
+
+                updateUI();
+                drawChart();
+            } else {
+                // Mostra cursore resize se vicino a una linea
+                const dataWithOffset = chartState.data.map(p => ({ x: p.x, y: p.y + chartState.offsetY }));
+                let minX = Math.min(...dataWithOffset.map(p => p.x));
+                let maxX = Math.max(...dataWithOffset.map(p => p.x));
+                const rangeX = maxX - minX;
+                minX -= rangeX * 0.1;
+                maxX += rangeX * 0.1;
+
+                const transformX = (x) => padding + (width - 2 * padding) * ((x - minX) / (maxX - minX));
+                const line1ScreenX = transformX(chartState.line1X);
+                const line2ScreenX = transformX(chartState.line2X);
+
+                if (Math.abs(mouseX - line1ScreenX) < 10 || Math.abs(mouseX - line2ScreenX) < 10) {
+                    canvas.style.cursor = 'ew-resize';
+                } else {
+                    canvas.style.cursor = 'default';
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', function(e) {
+            isDraggingLine = null;
+            canvas.style.cursor = 'default';
+        });
+
+        canvas.addEventListener('mouseleave', function(e) {
+            isDraggingLine = null;
+            canvas.style.cursor = 'default';
+        });
 
         // Carica automaticamente all'avvio
         window.addEventListener('load', function() {
