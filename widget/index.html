@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XY Chart - DXF CSV Viewer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #131824;
+            --bg-tertiary: #1a2030;
+            --accent-blue: #00d4ff;
+            --accent-cyan: #00ffaa;
+            --text-primary: #e8edf4;
+            --text-secondary: #8a94a8;
+            --border-color: #2a3447;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            font-family: 'Barlow', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .widget-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .chart-area {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #chartCanvas {
+            width: 100%;
+            height: 500px;
+            cursor: crosshair;
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(0, 212, 255, 0.03) 0%, transparent 100%);
+        }
+
+        .controls-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .control-group {
+            background: var(--bg-tertiary);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .control-group:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
+        }
+
+        .control-group h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .control-btn {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(0, 255, 170, 0.1));
+            border: 1px solid var(--accent-blue);
+            color: var(--text-primary);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: 'Barlow', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-btn:hover {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 255, 170, 0.2));
+            border-color: var(--accent-cyan);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 212, 255, 0.3);
+        }
+
+        .control-btn span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .toggle-btn.active {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .slider-container {
+            margin-top: 8px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .slider-value {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
+            font-weight: 500;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border-color);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 212, 255, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 4px 16px rgba(0, 212, 255, 0.6);
+        }
+
+        .info-panel {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .info-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .info-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--accent-cyan);
+        }
+    </style>
+</head>
+<body>
+    <div class="widget-container">
+        <div class="header">
+            <h1>XY Chart - DXF Viewer</h1>
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span id="connectionStatus">Caricamento...</span>
+            </div>
+        </div>
+
+        <div class="chart-area">
+            <canvas id="chartCanvas"></canvas>
+        </div>
+
+        <div class="controls-panel">
+            <!-- Zoom X -->
+            <div class="control-group">
+                <h3>🔍 Zoom X</h3>
+                <div class="button-grid">
+                    <button class="control-btn" onclick="zoomX(1.2)"><span>Zoom In</span></button>
+                    <button class="control-btn" onclick="zoomX(0.8)"><span>Zoom Out</span></button>
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Livello</span>
+                        <span class="slider-value" id="zoomXValue">1.00x</span>
+                    </div>
+                    <input type="range" id="zoomXSlider" min="0.1" max="10" step="0.1" value="1" oninput="setZoomX(this.value)">
+                </div>
+            </div>
+
+            <!-- Zoom Y -->
+            <div class="control-group">
+                <h3>🔍 Zoom Y</h3>
+                <div class="button-grid">
+                    <button class="control-btn" onclick="zoomY(1.2)"><span>Zoom In</span></button>
+                    <button class="control-btn" onclick="zoomY(0.8)"><span>Zoom Out</span></button>
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Livello</span>
+                        <span class="slider-value" id="zoomYValue">1.00x</span>
+                    </div>
+                    <input type="range" id="zoomYSlider" min="0.1" max="10" step="0.1" value="1" oninput="setZoomY(this.value)">
+                </div>
+            </div>
+
+            <!-- Pan X -->
+            <div class="control-group">
+                <h3>↔️ Pan X</h3>
+                <div class="button-grid">
+                    <button class="control-btn" onclick="panX(-20)"><span>← Sinistra</span></button>
+                    <button class="control-btn" onclick="panX(20)"><span>Destra →</span></button>
+                    <button class="control-btn full-width" onclick="resetPanX()"><span>Reset Pan X</span></button>
+                </div>
+            </div>
+
+            <!-- Pan Y -->
+            <div class="control-group">
+                <h3>↕️ Pan Y</h3>
+                <div class="button-grid">
+                    <button class="control-btn" onclick="panY(-20)"><span>↑ Su</span></button>
+                    <button class="control-btn" onclick="panY(20)"><span>Giù ↓</span></button>
+                    <button class="control-btn full-width" onclick="resetPanY()"><span>Reset Pan Y</span></button>
+                </div>
+            </div>
+
+            <!-- AutoScale -->
+            <div class="control-group">
+                <h3>⚙️ AutoScale</h3>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="control-btn toggle-btn active" id="autoScaleX" onclick="toggleAutoScale('x')" style="flex: 1; min-width: 120px;">
+                        <span>AutoScale X</span>
+                    </button>
+                    <button class="control-btn toggle-btn active" id="autoScaleY" onclick="toggleAutoScale('y')" style="flex: 1; min-width: 120px;">
+                        <span>AutoScale Y</span>
+                    </button>
+                </div>
+                <button class="control-btn full-width" onclick="resetAll()" style="margin-top: 8px;">
+                    <span>🔄 Reset Tutto</span>
+                </button>
+            </div>
+
+            <!-- Refresh -->
+            <div class="control-group">
+                <h3>📊 Dati</h3>
+                <button class="control-btn full-width" onclick="loadCSVData()">
+                    <span>🔄 Ricarica CSV</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-item">
+                <span class="info-label">Punti Dati</span>
+                <span class="info-value" id="dataPointsCount">0</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Zoom X</span>
+                <span class="info-value" id="currentZoomX">1.00x</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Zoom Y</span>
+                <span class="info-value" id="currentZoomY">1.00x</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Pan X</span>
+                <span class="info-value" id="currentPanX">0</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Pan Y</span>
+                <span class="info-value" id="currentPanY">0</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">AutoScale</span>
+                <span class="info-value" id="autoScaleStatus">X, Y</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chartState = {
+            data: [],
+            zoomX: 1,
+            zoomY: 1,
+            panX: 0,
+            panY: 0,
+            autoScaleX: true,
+            autoScaleY: true,
+            isDragging: false,
+            lastMouseX: 0,
+            lastMouseY: 0
+        };
+
+        const canvas = document.getElementById('chartCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            drawChart();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // ===== CARICA CSV =====
+        function loadCSVData() {
+            console.log("Caricamento CSV...");
+            document.getElementById('connectionStatus').textContent = 'Caricamento CSV...';
+
+            // Percorso relativo al CSV nella cartella data
+            fetch('../data/output.csv?' + new Date().getTime())  // Cache busting
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('File CSV non trovato');
+                    }
+                    return response.text();
+                })
+                .then(csvText => {
+                    parseCSV(csvText);
+                })
+                .catch(error => {
+                    console.error('Errore caricamento CSV:', error);
+                    document.getElementById('connectionStatus').textContent = 'ERRORE: ' + error.message;
+                    chartState.data = [];
+                    updateUI();
+                    drawChart();
+                });
+        }
+
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            chartState.data = [];
+
+            // Salta l'header (prima riga)
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line === '') continue;
+
+                const parts = line.split(',');
+                if (parts.length >= 2) {
+                    const x = parseFloat(parts[0]);
+                    const y = parseFloat(parts[1]);
+
+                    if (!isNaN(x) && !isNaN(y)) {
+                        chartState.data.push({ x: x, y: y });
+                    }
+                }
+            }
+
+            console.log('CSV parsato: ' + chartState.data.length + ' punti');
+            document.getElementById('connectionStatus').textContent = 'CSV caricato (' + chartState.data.length + ' punti)';
+
+            updateUI();
+            drawChart();
+        }
+
+        // ===== CONTROLLI =====
+        function zoomX(factor) {
+            chartState.zoomX *= factor;
+            chartState.zoomX = Math.max(0.1, Math.min(10, chartState.zoomX));
+            updateUI();
+            drawChart();
+        }
+
+        function zoomY(factor) {
+            chartState.zoomY *= factor;
+            chartState.zoomY = Math.max(0.1, Math.min(10, chartState.zoomY));
+            updateUI();
+            drawChart();
+        }
+
+        function setZoomX(value) {
+            chartState.zoomX = parseFloat(value);
+            updateUI();
+            drawChart();
+        }
+
+        function setZoomY(value) {
+            chartState.zoomY = parseFloat(value);
+            updateUI();
+            drawChart();
+        }
+
+        function panX(amount) {
+            chartState.panX += amount;
+            updateUI();
+            drawChart();
+        }
+
+        function panY(amount) {
+            chartState.panY += amount;
+            updateUI();
+            drawChart();
+        }
+
+        function resetPanX() {
+            chartState.panX = 0;
+            updateUI();
+            drawChart();
+        }
+
+        function resetPanY() {
+            chartState.panY = 0;
+            updateUI();
+            drawChart();
+        }
+
+        function toggleAutoScale(axis) {
+            if (axis === 'x') {
+                chartState.autoScaleX = !chartState.autoScaleX;
+                document.getElementById('autoScaleX').classList.toggle('active');
+            } else {
+                chartState.autoScaleY = !chartState.autoScaleY;
+                document.getElementById('autoScaleY').classList.toggle('active');
+            }
+            updateUI();
+            drawChart();
+        }
+
+        function resetAll() {
+            chartState.zoomX = 1;
+            chartState.zoomY = 1;
+            chartState.panX = 0;
+            chartState.panY = 0;
+            chartState.autoScaleX = true;
+            chartState.autoScaleY = true;
+            document.getElementById('autoScaleX').classList.add('active');
+            document.getElementById('autoScaleY').classList.add('active');
+            document.getElementById('zoomXSlider').value = 1;
+            document.getElementById('zoomYSlider').value = 1;
+            updateUI();
+            drawChart();
+        }
+
+        function updateUI() {
+            document.getElementById('zoomXValue').textContent = chartState.zoomX.toFixed(2) + 'x';
+            document.getElementById('zoomYValue').textContent = chartState.zoomY.toFixed(2) + 'x';
+            document.getElementById('dataPointsCount').textContent = chartState.data.length;
+            document.getElementById('currentZoomX').textContent = chartState.zoomX.toFixed(2) + 'x';
+            document.getElementById('currentZoomY').textContent = chartState.zoomY.toFixed(2) + 'x';
+            document.getElementById('currentPanX').textContent = chartState.panX.toFixed(0);
+            document.getElementById('currentPanY').textContent = chartState.panY.toFixed(0);
+
+            let autoScaleText = [];
+            if (chartState.autoScaleX) autoScaleText.push('X');
+            if (chartState.autoScaleY) autoScaleText.push('Y');
+            document.getElementById('autoScaleStatus').textContent = autoScaleText.length > 0 ? autoScaleText.join(', ') : 'Off';
+
+            document.getElementById('zoomXSlider').value = chartState.zoomX;
+            document.getElementById('zoomYSlider').value = chartState.zoomY;
+        }
+
+        function drawChart() {
+            const rect = canvas.getBoundingClientRect();
+            const width = rect.width;
+            const height = rect.height;
+            const padding = 60;
+
+            ctx.clearRect(0, 0, width, height);
+
+            if (chartState.data.length === 0) {
+                ctx.fillStyle = '#8a94a8';
+                ctx.font = '16px Barlow';
+                ctx.textAlign = 'center';
+                ctx.fillText('Nessun dato disponibile.', width / 2, height / 2 - 10);
+                ctx.fillText('Carica un file DXF e clicca "Ricarica CSV"', width / 2, height / 2 + 15);
+                return;
+            }
+
+            let minX = Math.min(...chartState.data.map(p => p.x));
+            let maxX = Math.max(...chartState.data.map(p => p.x));
+            let minY = Math.min(...chartState.data.map(p => p.y));
+            let maxY = Math.max(...chartState.data.map(p => p.y));
+
+            if (chartState.autoScaleX) {
+                const rangeX = maxX - minX;
+                minX -= rangeX * 0.1;
+                maxX += rangeX * 0.1;
+            } else {
+                const centerX = (minX + maxX) / 2;
+                const rangeX = (maxX - minX) / chartState.zoomX;
+                minX = centerX - rangeX / 2 - chartState.panX;
+                maxX = centerX + rangeX / 2 - chartState.panX;
+            }
+
+            if (chartState.autoScaleY) {
+                const rangeY = maxY - minY;
+                minY -= rangeY * 0.1;
+                maxY += rangeY * 0.1;
+            } else {
+                const centerY = (minY + maxY) / 2;
+                const rangeY = (maxY - minY) / chartState.zoomY;
+                minY = centerY - rangeY / 2 + chartState.panY;
+                maxY = centerY + rangeY / 2 + chartState.panY;
+            }
+
+            // Grid
+            ctx.strokeStyle = '#2a3447';
+            ctx.lineWidth = 1;
+
+            for (let i = 0; i <= 10; i++) {
+                const x = padding + (width - 2 * padding) * (i / 10);
+                ctx.beginPath();
+                ctx.moveTo(x, padding);
+                ctx.lineTo(x, height - padding);
+                ctx.stroke();
+
+                const y = padding + (height - 2 * padding) * (i / 10);
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(width - padding, y);
+                ctx.stroke();
+            }
+
+            // Axes
+            ctx.strokeStyle = '#8a94a8';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, height - padding);
+            ctx.lineTo(width - padding, height - padding);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, height - padding);
+            ctx.stroke();
+
+            // Labels
+            ctx.fillStyle = '#8a94a8';
+            ctx.font = '12px JetBrains Mono';
+            ctx.textAlign = 'center';
+
+            for (let i = 0; i <= 5; i++) {
+                const x = padding + (width - 2 * padding) * (i / 5);
+                const value = minX + (maxX - minX) * (i / 5);
+                ctx.fillText(value.toFixed(1), x, height - padding + 20);
+            }
+
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const y = height - padding - (height - 2 * padding) * (i / 5);
+                const value = minY + (maxY - minY) * (i / 5);
+                ctx.fillText(value.toFixed(1), padding - 10, y + 4);
+            }
+
+            const transformX = (x) => padding + (width - 2 * padding) * ((x - minX) / (maxX - minX));
+            const transformY = (y) => height - padding - (height - 2 * padding) * ((y - minY) / (maxY - minY));
+
+            // Line
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            chartState.data.forEach((point, index) => {
+                const x = transformX(point.x);
+                const y = transformY(point.y);
+                if (index === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Points
+            chartState.data.forEach(point => {
+                const x = transformX(point.x);
+                const y = transformY(point.y);
+
+                const gradient = ctx.createRadialGradient(x, y, 0, x, y, 8);
+                gradient.addColorStop(0, 'rgba(0, 255, 170, 0.4)');
+                gradient.addColorStop(1, 'rgba(0, 255, 170, 0)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#00ffaa';
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Axis titles
+            ctx.fillStyle = '#e8edf4';
+            ctx.font = '14px Barlow';
+            ctx.textAlign = 'center';
+            ctx.fillText('Asse X', width / 2, height - 10);
+
+            ctx.save();
+            ctx.translate(20, height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('Asse Y', 0, 0);
+            ctx.restore();
+        }
+
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => {
+            chartState.isDragging = true;
+            chartState.lastMouseX = e.clientX;
+            chartState.lastMouseY = e.clientY;
+            canvas.style.cursor = 'grabbing';
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (chartState.isDragging) {
+                const deltaX = e.clientX - chartState.lastMouseX;
+                const deltaY = e.clientY - chartState.lastMouseY;
+
+                if (!chartState.autoScaleX) chartState.panX += deltaX * 0.5;
+                if (!chartState.autoScaleY) chartState.panY -= deltaY * 0.5;
+
+                chartState.lastMouseX = e.clientX;
+                chartState.lastMouseY = e.clientY;
+
+                updateUI();
+                drawChart();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            chartState.isDragging = false;
+            canvas.style.cursor = 'crosshair';
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            chartState.isDragging = false;
+            canvas.style.cursor = 'crosshair';
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            if (e.shiftKey) zoomY(zoomFactor);
+            else zoomX(zoomFactor);
+        });
+
+        // Carica automaticamente all'avvio
+        window.addEventListener('load', function() {
+            console.log('Widget caricato - Tentativo caricamento CSV...');
+            loadCSVData();
+
+            // Auto-refresh ogni 2 secondi
+            setInterval(loadCSVData, 2000);
+        });
+    </script>
+</body>
+</html>
