@@ -892,13 +892,14 @@
             const controlY = entity.data[20] || [];
             const fitX = entity.data[11] || [];
             const fitY = entity.data[21] || [];
+            const degree = entity.data[71] ? parseInt(entity.data[71][0]) : 3;
             const closed = entity.data[70] && parseInt(entity.data[70][0]) & 1;
 
             // Usa fit points se disponibili, altrimenti control points
-            const xs = fitX.length > 0 ? fitX : controlX;
-            const ys = fitY.length > 0 ? fitY : controlY;
+            let xs = fitX.length > 0 ? fitX : controlX;
+            let ys = fitY.length > 0 ? fitY : controlY;
 
-            console.log('  SPLINE con ' + xs.length + ' punti, closed=' + closed);
+            console.log('  SPLINE con ' + xs.length + ' punti originali, degree=' + degree + ', closed=' + closed);
 
             if (xs.length < 2) {
                 console.warn('  SPLINE senza punti sufficienti');
@@ -907,25 +908,108 @@
 
             const startLength = xPoints.length;
 
-            for (let i = 0; i < xs.length - 1; i++) {
-                const x1 = parseFloat(xs[i]);
-                const y1 = parseFloat(ys[i]);
-                const x2 = parseFloat(xs[i + 1]);
-                const y2 = parseFloat(ys[i + 1]);
-                interpolateLine(x1, y1, x2, y2, xPoints, yPoints);
+            // Genera punti poligonali dalla spline (equivalente a PolygonalVertexes(100) in C#)
+            // Numero di segmenti proporzionale al numero di control points
+            const numPolygonalPoints = Math.max(50, xs.length * 20);
+            const polygonalPoints = generatePolygonalVertices(xs, ys, closed, numPolygonalPoints);
+
+            console.log('  Generati ' + polygonalPoints.length + ' punti poligonali dalla spline');
+
+            // Ora interpola tra i punti poligonali (come nel codice C#)
+            for (let i = 0; i < polygonalPoints.length - 1; i++) {
+                interpolateLine(
+                    polygonalPoints[i].x,
+                    polygonalPoints[i].y,
+                    polygonalPoints[i + 1].x,
+                    polygonalPoints[i + 1].y,
+                    xPoints,
+                    yPoints
+                );
             }
 
             // Se chiusa, collega ultimo a primo
-            if (closed && xs.length > 1) {
-                const x1 = parseFloat(xs[xs.length - 1]);
-                const y1 = parseFloat(ys[ys.length - 1]);
-                const x2 = parseFloat(xs[0]);
-                const y2 = parseFloat(ys[0]);
-                interpolateLine(x1, y1, x2, y2, xPoints, yPoints);
+            if (closed && polygonalPoints.length > 1) {
+                interpolateLine(
+                    polygonalPoints[polygonalPoints.length - 1].x,
+                    polygonalPoints[polygonalPoints.length - 1].y,
+                    polygonalPoints[0].x,
+                    polygonalPoints[0].y,
+                    xPoints,
+                    yPoints
+                );
             }
 
             const addedPoints = xPoints.length - startLength;
             console.log('  SPLINE processata. Punti aggiunti:', addedPoints);
+        }
+
+        // Genera punti poligonali da una spline usando interpolazione Catmull-Rom
+        // Simula il comportamento di PolygonalVertexes(100) del codice C#
+        function generatePolygonalVertices(xs, ys, closed, numPoints) {
+            const points = [];
+
+            // Converti in array di oggetti {x, y}
+            const controlPoints = [];
+            for (let i = 0; i < xs.length; i++) {
+                controlPoints.push({
+                    x: parseFloat(xs[i]),
+                    y: parseFloat(ys[i])
+                });
+            }
+
+            if (controlPoints.length === 2) {
+                // Se ci sono solo 2 punti, ritorna quelli
+                return controlPoints;
+            }
+
+            // Usa interpolazione Catmull-Rom per generare una curva liscia
+            const segments = controlPoints.length - (closed ? 0 : 1);
+            const pointsPerSegment = Math.floor(numPoints / segments);
+
+            for (let i = 0; i < segments; i++) {
+                const p0 = closed ? controlPoints[(i - 1 + controlPoints.length) % controlPoints.length] :
+                           (i === 0 ? controlPoints[0] : controlPoints[i - 1]);
+                const p1 = controlPoints[i];
+                const p2 = controlPoints[(i + 1) % controlPoints.length];
+                const p3 = closed ? controlPoints[(i + 2) % controlPoints.length] :
+                           (i + 2 < controlPoints.length ? controlPoints[i + 2] : controlPoints[controlPoints.length - 1]);
+
+                for (let t = 0; t < pointsPerSegment; t++) {
+                    const u = t / pointsPerSegment;
+                    const point = catmullRomPoint(p0, p1, p2, p3, u);
+                    points.push(point);
+                }
+            }
+
+            // Aggiungi l'ultimo punto se non chiusa
+            if (!closed && points.length > 0) {
+                const lastControl = controlPoints[controlPoints.length - 1];
+                points.push({ x: lastControl.x, y: lastControl.y });
+            }
+
+            return points;
+        }
+
+        // Interpolazione Catmull-Rom tra 4 punti di controllo
+        function catmullRomPoint(p0, p1, p2, p3, t) {
+            const t2 = t * t;
+            const t3 = t2 * t;
+
+            const x = 0.5 * (
+                (2 * p1.x) +
+                (-p0.x + p2.x) * t +
+                (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+                (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+            );
+
+            const y = 0.5 * (
+                (2 * p1.y) +
+                (-p0.y + p2.y) * t +
+                (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+                (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+            );
+
+            return { x: x, y: y };
         }
 
         // ===== FUNZIONI LEGACY (NON PIÙ USATE) =====
