@@ -1596,9 +1596,25 @@
             }
 
             try {
+                // Determina range X dei limiti orizzontali
+                const minLimitX = Math.min(chartState.line1X, chartState.line2X);
+                const maxLimitX = Math.max(chartState.line1X, chartState.line2X);
+
+                // Filtra punti compresi tra i limiti e applica offset Y
+                const filteredPoints = chartState.data.filter(point =>
+                    point.x >= minLimitX && point.x <= maxLimitX
+                );
+
+                if (filteredPoints.length === 0) {
+                    alert('Nessun punto compreso tra i limiti orizzontali.');
+                    return;
+                }
+
                 let csv = 'X,Y\n';
-                chartState.data.forEach(point => {
-                    csv += point.x.toFixed(6) + ',' + point.y.toFixed(6) + '\n';
+                filteredPoints.forEach(point => {
+                    const x = point.x;
+                    const y = point.y + chartState.offsetY;  // Applica offset
+                    csv += x.toFixed(6) + ',' + y.toFixed(6) + '\n';
                 });
 
                 // Crea blob e scarica
@@ -1616,8 +1632,8 @@
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
 
-                console.log('CSV scaricato: ' + chartState.data.length + ' punti');
-                document.getElementById('connectionStatus').textContent = 'CSV esportato (' + chartState.data.length + ' punti)';
+                console.log('CSV scaricato: ' + filteredPoints.length + ' punti (da X=' + minLimitX.toFixed(2) + ' a X=' + maxLimitX.toFixed(2) + ', offset Y=' + chartState.offsetY + ')');
+                document.getElementById('connectionStatus').textContent = 'CSV esportato (' + filteredPoints.length + ' punti con offset)';
             } catch (error) {
                 console.error('Errore export CSV:', error);
                 alert('Errore durante l\'esportazione del CSV: ' + error.message);
