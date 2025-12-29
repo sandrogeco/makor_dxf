@@ -363,20 +363,29 @@
                 </div>
             </div>
 
-            <!-- Zoom X -->
+            <!-- Range Selector X -->
             <div class="control-group">
-                <h3>🔍 Zoom Asse X</h3>
+                <h3>🔍 Selezione Range X</h3>
                 <div class="slider-container">
                     <div class="slider-label">
-                        <span>Livello Zoom</span>
-                        <span class="slider-value" id="zoomXValue">100%</span>
+                        <span>Da</span>
+                        <span class="slider-value" id="xRangeMinValue">0%</span>
                     </div>
-                    <input type="range" id="zoomXSlider" min="10" max="500" value="100" step="10"
-                           oninput="setZoomX(this.value)"
+                    <input type="range" id="xRangeMinSlider" min="0" max="100" value="0" step="1"
+                           oninput="setXRangeMin(this.value)"
+                           style="width: 100%;">
+                </div>
+                <div class="slider-container" style="margin-top: 8px;">
+                    <div class="slider-label">
+                        <span>A</span>
+                        <span class="slider-value" id="xRangeMaxValue">100%</span>
+                    </div>
+                    <input type="range" id="xRangeMaxSlider" min="0" max="100" value="100" step="1"
+                           oninput="setXRangeMax(this.value)"
                            style="width: 100%;">
                 </div>
                 <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
-                    10% = zoom out, 500% = zoom in
+                    Seleziona l'intervallo dell'asse X da visualizzare
                 </div>
             </div>
 
@@ -437,7 +446,8 @@
             offsetY: 0,
             line1X: 0,
             line2X: 100,
-            zoomX: 1.0  // 1.0 = 100% (nessun zoom)
+            xRangeMin: 0,   // 0% = inizio dati
+            xRangeMax: 100  // 100% = fine dati
         };
 
         let INTERPOLATION_STEP = 0.005;
@@ -498,6 +508,11 @@
             lastLoadType = 'csv';
             lastDxfString = null;  // Reset DXF quando carichi CSV
             lastDxfFileName = null;
+
+            // Reset offset Y a 0
+            chartState.offsetY = 0;
+            document.getElementById('offsetYInput').value = 0;
+
             console.log('CSV salvato per refresh. lastLoadType:', lastLoadType);
             applyCSVData(csvText);
         }
@@ -570,10 +585,30 @@
             reloadLastFile();
         }
 
-        function setZoomX(value) {
-            chartState.zoomX = parseFloat(value) / 100.0;  // Converti percentuale a fattore
-            updateUI();
-            drawChart();
+        function setXRangeMin(value) {
+            const val = parseFloat(value);
+            // Assicura che min < max
+            if (val < chartState.xRangeMax) {
+                chartState.xRangeMin = val;
+                updateUI();
+                drawChart();
+            } else {
+                // Reset slider se va oltre max
+                document.getElementById('xRangeMinSlider').value = chartState.xRangeMin;
+            }
+        }
+
+        function setXRangeMax(value) {
+            const val = parseFloat(value);
+            // Assicura che max > min
+            if (val > chartState.xRangeMin) {
+                chartState.xRangeMax = val;
+                updateUI();
+                drawChart();
+            } else {
+                // Reset slider se va sotto min
+                document.getElementById('xRangeMaxSlider').value = chartState.xRangeMax;
+            }
         }
 
         function setLine1X(value) {
@@ -594,7 +629,8 @@
             document.getElementById('currentOffsetY').textContent = chartState.offsetY.toFixed(0);
             document.getElementById('interpolationValue').textContent = INTERPOLATION_STEP.toFixed(3);
             document.getElementById('currentInterpolation').textContent = INTERPOLATION_STEP.toFixed(3);
-            document.getElementById('zoomXValue').textContent = (chartState.zoomX * 100).toFixed(0) + '%';
+            document.getElementById('xRangeMinValue').textContent = chartState.xRangeMin.toFixed(0) + '%';
+            document.getElementById('xRangeMaxValue').textContent = chartState.xRangeMax.toFixed(0) + '%';
             document.getElementById('line1Value').textContent = chartState.line1X.toFixed(0);
             document.getElementById('line2Value').textContent = chartState.line2X.toFixed(0);
 
@@ -638,12 +674,15 @@
             let maxX = Math.max(...chartState.data.map(p => p.x));
             let maxY = Math.max(...chartState.data.map(p => p.y));
 
-            // AutoScale X con margine 10% e zoom
-            const rangeX = maxX - minX;
-            const centerX = (minX + maxX) / 2;
-            const zoomedRangeX = rangeX / chartState.zoomX;  // Zoom in = range più piccolo
-            minX = centerX - zoomedRangeX / 2;
-            maxX = centerX + zoomedRangeX / 2;
+            // Applica range selector X (in percentuale 0-100)
+            const dataMinX = minX;
+            const dataMaxX = maxX;
+            const dataRangeX = dataMaxX - dataMinX;
+
+            // Calcola minX e maxX basati sulle percentuali selezionate
+            minX = dataMinX + (dataRangeX * chartState.xRangeMin / 100);
+            maxX = dataMinX + (dataRangeX * chartState.xRangeMax / 100);
+
             // Aggiungi margine 10%
             const marginX = (maxX - minX) * 0.1;
             minX -= marginX;
@@ -836,6 +875,11 @@
                     lastDxfFileName = file.name;
                     lastLoadType = 'dxf';
                     lastCsvData = null;  // Reset CSV quando carichi DXF
+
+                    // Reset offset Y a 0
+                    chartState.offsetY = 0;
+                    document.getElementById('offsetYInput').value = 0;
+
                     console.log('DXF salvato per refresh. lastLoadType:', lastLoadType);
                     parseDXF(dxfString, file.name);
                 } catch (error) {
