@@ -1600,13 +1600,21 @@
                 const minLimitX = Math.min(chartState.line1X, chartState.line2X);
                 const maxLimitX = Math.max(chartState.line1X, chartState.line2X);
 
+                console.log('=== EXPORT CSV ===');
+                console.log('Limiti X:', minLimitX, 'a', maxLimitX);
+                console.log('Offset Y:', chartState.offsetY);
+                console.log('Punti totali:', chartState.data.length);
+
                 // Filtra punti compresi tra i limiti e applica offset Y
                 const filteredPoints = chartState.data.filter(point =>
                     point.x >= minLimitX && point.x <= maxLimitX
                 );
 
+                console.log('Punti filtrati:', filteredPoints.length);
+
                 if (filteredPoints.length === 0) {
-                    alert('Nessun punto compreso tra i limiti orizzontali.');
+                    console.warn('Range dati X:', Math.min(...chartState.data.map(p => p.x)), 'a', Math.max(...chartState.data.map(p => p.x)));
+                    alert('Nessun punto compreso tra i limiti orizzontali.\nLimiti: ' + minLimitX.toFixed(2) + ' - ' + maxLimitX.toFixed(2));
                     return;
                 }
 
