@@ -445,12 +445,12 @@
                 </div>
             </div>
 
-            <!-- Linee Verticali -->
+            <!-- Limiti Orizzontali -->
             <div class="control-group">
-                <h3>📏 Linee Verticali</h3>
+                <h3>📏 Limiti Orizzontali</h3>
                 <div class="slider-container" style="margin-bottom: 8px;">
                     <div class="slider-label">
-                        <span>Linea 1 (X)</span>
+                        <span>Limite 1 (X)</span>
                         <span class="slider-value" id="line1Value">0</span>
                     </div>
                     <input type="number" id="line1Input" value="0" step="0.005"
@@ -459,7 +459,7 @@
                 </div>
                 <div class="slider-container">
                     <div class="slider-label">
-                        <span>Linea 2 (X)</span>
+                        <span>Limite 2 (X)</span>
                         <span class="slider-value" id="line2Value">100</span>
                     </div>
                     <input type="number" id="line2Input" value="100" step="0.005"
@@ -467,7 +467,7 @@
                            style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">
                 </div>
                 <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
-                    Trascina le linee sul grafico per spostarle
+                    Trascina i limiti sul grafico per spostarli
                 </div>
             </div>
         </div>
@@ -595,6 +595,17 @@
 
             console.log('CSV parsato: ' + chartState.data.length + ' punti');
             document.getElementById('connectionStatus').textContent = 'CSV caricato (' + chartState.data.length + ' punti)';
+
+            // Inizializza limiti orizzontali a min(x) e max(x)
+            if (chartState.data.length > 0) {
+                const xValues = chartState.data.map(p => p.x);
+                const minX = Math.min(...xValues);
+                const maxX = Math.max(...xValues);
+                chartState.line1X = minX;
+                chartState.line2X = maxX;
+                document.getElementById('line1Input').value = minX.toFixed(3);
+                document.getElementById('line2Input').value = maxX.toFixed(3);
+            }
 
             updateUI();
             drawChart();
@@ -854,11 +865,27 @@
             ctx.fillText('Asse Y', 0, 0);
             ctx.restore();
 
-            // Disegna linee verticali
+            // Disegna limiti orizzontali (linee verticali)
             const line1ScreenX = transformX(chartState.line1X);
             const line2ScreenX = transformX(chartState.line2X);
 
-            // Linea 1 (rosso)
+            // Trova Y alla posizione X delle linee (dal dataset con offset)
+            const findYatX = (targetX) => {
+                for (let i = 0; i < dataWithOffset.length - 1; i++) {
+                    const p1 = dataWithOffset[i];
+                    const p2 = dataWithOffset[i + 1];
+                    if ((p1.x <= targetX && targetX <= p2.x) || (p2.x <= targetX && targetX <= p1.x)) {
+                        const t = Math.abs(p2.x - p1.x) < 0.00001 ? 0 : (targetX - p1.x) / (p2.x - p1.x);
+                        return p1.y + t * (p2.y - p1.y);
+                    }
+                }
+                return null;
+            };
+
+            const line1Y = findYatX(chartState.line1X);
+            const line2Y = findYatX(chartState.line2X);
+
+            // Limite 1 (rosso)
             ctx.strokeStyle = '#ff4444';
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
@@ -868,13 +895,15 @@
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Label Linea 1
+            // Label Limite 1 con coordinate X e Y
             ctx.fillStyle = '#ff4444';
             ctx.font = '11px JetBrains Mono';
             ctx.textAlign = 'left';
-            ctx.fillText('L1: ' + chartState.line1X.toFixed(decimalsX), line1ScreenX + 5, padding + 15);
+            const line1Label = 'L1: X=' + chartState.line1X.toFixed(decimalsX) +
+                               (line1Y !== null ? ' Y=' + line1Y.toFixed(decimalsY) : '');
+            ctx.fillText(line1Label, line1ScreenX + 5, padding + 15);
 
-            // Linea 2 (verde)
+            // Limite 2 (verde)
             ctx.strokeStyle = '#44ff44';
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
@@ -884,11 +913,33 @@
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Label Linea 2
+            // Label Limite 2 con coordinate X e Y
             ctx.fillStyle = '#44ff44';
             ctx.font = '11px JetBrains Mono';
             ctx.textAlign = 'left';
-            ctx.fillText('L2: ' + chartState.line2X.toFixed(decimalsX), line2ScreenX + 5, padding + 30);
+            const line2Label = 'L2: X=' + chartState.line2X.toFixed(decimalsX) +
+                               (line2Y !== null ? ' Y=' + line2Y.toFixed(decimalsY) : '');
+            ctx.fillText(line2Label, line2ScreenX + 5, padding + 30);
+
+            // Linea orizzontale per offset (se offset ≠ 0)
+            if (chartState.offsetY !== 0) {
+                const offsetScreenY = transformY(chartState.offsetY);
+
+                ctx.strokeStyle = '#ffaa00';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([10, 5]);
+                ctx.beginPath();
+                ctx.moveTo(padding, offsetScreenY);
+                ctx.lineTo(width - padding, offsetScreenY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Label linea offset
+                ctx.fillStyle = '#ffaa00';
+                ctx.font = '11px JetBrains Mono';
+                ctx.textAlign = 'right';
+                ctx.fillText('Offset: Y=' + chartState.offsetY.toFixed(decimalsY), width - padding - 5, offsetScreenY - 5);
+            }
         }
 
         // ===== FILE UPLOAD =====
@@ -1098,6 +1149,12 @@
                 const maxX = Math.max(...xPoints);
                 const minY = Math.min(...yPoints);
                 const maxY = Math.max(...yPoints);
+
+                // Inizializza limiti orizzontali a min(x) e max(x)
+                chartState.line1X = minX;
+                chartState.line2X = maxX;
+                document.getElementById('line1Input').value = minX.toFixed(3);
+                document.getElementById('line2Input').value = maxX.toFixed(3);
 
                 let successMsg = `Caricati ${xPoints.length} punti`;
                 const parts = [];
