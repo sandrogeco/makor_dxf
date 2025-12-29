@@ -489,9 +489,13 @@
         }
 
         function parseCSV(csvText) {
-            // Salva per refresh automatico
+            console.log('=== CARICAMENTO NUOVO CSV ===');
+            // Salva per refresh automatico e resetta DXF
             lastCsvData = csvText;
             lastLoadType = 'csv';
+            lastDxfString = null;  // Reset DXF quando carichi CSV
+            lastDxfFileName = null;
+            console.log('CSV salvato per refresh. lastLoadType:', lastLoadType);
             applyCSVData(csvText);
         }
 
@@ -524,11 +528,19 @@
 
         // ===== CONTROLLI =====
         function reloadLastFile() {
+            console.log('=== RELOAD LAST FILE ===');
+            console.log('lastLoadType:', lastLoadType);
+            console.log('lastDxfString presente:', !!lastDxfString);
+            console.log('lastCsvData presente:', !!lastCsvData);
+
             if (lastLoadType === 'dxf' && lastDxfString) {
+                console.log('→ Ricarico DXF');
                 parseDXF(lastDxfString, lastDxfFileName);
             } else if (lastLoadType === 'csv' && lastCsvData) {
+                console.log('→ Ricarico CSV');
                 applyCSVData(lastCsvData);
             } else {
+                console.log('→ Nessun file da ricaricare, ridisegno solo');
                 drawChart();
             }
         }
@@ -781,6 +793,9 @@
             const file = event.target.files[0];
             if (!file) return;
 
+            console.log('=== CARICAMENTO NUOVO DXF ===');
+            console.log('File:', file.name);
+
             document.getElementById('fileName').textContent = file.name;
             document.getElementById('connectionStatus').textContent = 'Caricamento DXF...';
 
@@ -788,10 +803,12 @@
             reader.onload = function(e) {
                 try {
                     const dxfString = e.target.result;
-                    // Salva per refresh automatico
+                    // Salva per refresh automatico e resetta CSV
                     lastDxfString = dxfString;
                     lastDxfFileName = file.name;
                     lastLoadType = 'dxf';
+                    lastCsvData = null;  // Reset CSV quando carichi DXF
+                    console.log('DXF salvato per refresh. lastLoadType:', lastLoadType);
                     parseDXF(dxfString, file.name);
                 } catch (error) {
                     console.error('Errore lettura file:', error);
