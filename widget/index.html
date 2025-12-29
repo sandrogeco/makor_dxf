@@ -655,9 +655,9 @@
             minX -= marginX;
             maxX += marginX;
 
-            // Asse Y: parte da minY o 0 (il più piccolo), fino a maxY + 15%
-            if (minY > 0) minY = 0;  // Se tutti i dati sono positivi, parte da 0
-            maxY = maxY + (maxY - minY) * 0.15;  // +15% del range
+            // Asse Y: da 0 a max(y) * 1.25
+            minY = 0;
+            maxY = maxY * 1.25;
 
             // Grid
             ctx.strokeStyle = '#2a3447';
@@ -972,9 +972,18 @@
                     yPoints[i] *= SCALE_FACTOR;
                 }
 
-                console.log('Scala applicata. Range prima della conversione in chartState.data');
+                console.log('Scala applicata.');
                 console.log('X:', Math.min(...xPoints).toFixed(2), 'to', Math.max(...xPoints).toFixed(2));
                 console.log('Y:', Math.min(...yPoints).toFixed(2), 'to', Math.max(...yPoints).toFixed(2));
+
+                // Normalizza Y: sottrai min(y) da tutti i punti
+                const minYValue = Math.min(...yPoints);
+                for (let i = 0; i < yPoints.length; i++) {
+                    yPoints[i] -= minYValue;
+                }
+
+                console.log('Normalizzazione Y completata. min(y) sottratto:', minYValue.toFixed(2));
+                console.log('Y dopo normalizzazione:', Math.min(...yPoints).toFixed(2), 'to', Math.max(...yPoints).toFixed(2));
 
                 // Converti in formato chartState.data
                 chartState.data = [];
