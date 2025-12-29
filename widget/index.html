@@ -14,15 +14,16 @@
         }
 
         :root {
-            --bg-primary: #0a0e1a;
-            --bg-secondary: #131824;
-            --bg-tertiary: #1a2030;
-            --accent-blue: #00d4ff;
-            --accent-cyan: #00ffaa;
-            --text-primary: #e8edf4;
-            --text-secondary: #8a94a8;
-            --border-color: #2a3447;
-            --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            --bg-primary: #fefdfb;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f8f6f3;
+            --accent-blue: #0066cc;
+            --accent-cyan: #009688;
+            --accent-color: #0066cc;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --border-color: #e0e0e0;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         body {
@@ -728,7 +729,7 @@
             ctx.clearRect(0, 0, width, height);
 
             if (chartState.data.length === 0) {
-                ctx.fillStyle = '#8a94a8';
+                ctx.fillStyle = '#666666';
                 ctx.font = '16px Barlow';
                 ctx.textAlign = 'center';
                 ctx.fillText('Nessun dato disponibile.', width / 2, height / 2 - 10);
@@ -766,7 +767,7 @@
             }));
 
             // Grid
-            ctx.strokeStyle = '#2a3447';
+            ctx.strokeStyle = '#e0e0e0';
             ctx.lineWidth = 1;
 
             for (let i = 0; i <= 10; i++) {
@@ -784,7 +785,7 @@
             }
 
             // Axes
-            ctx.strokeStyle = '#8a94a8';
+            ctx.strokeStyle = '#666666';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(padding, height - padding);
@@ -796,7 +797,7 @@
             ctx.stroke();
 
             // Labels
-            ctx.fillStyle = '#8a94a8';
+            ctx.fillStyle = '#666666';
             ctx.font = '12px JetBrains Mono';
             ctx.textAlign = 'center';
 
@@ -823,7 +824,7 @@
             const transformY = (y) => height - padding - (height - 2 * padding) * ((y - minY) / (maxY - minY));
 
             // Line
-            ctx.strokeStyle = '#00d4ff';
+            ctx.strokeStyle = '#0066cc';
             ctx.lineWidth = 2;
             ctx.beginPath();
             dataWithOffset.forEach((point, index) => {
@@ -834,27 +835,8 @@
             });
             ctx.stroke();
 
-            // Points
-            dataWithOffset.forEach(point => {
-                const x = transformX(point.x);
-                const y = transformY(point.y);
-
-                const gradient = ctx.createRadialGradient(x, y, 0, x, y, 8);
-                gradient.addColorStop(0, 'rgba(0, 255, 170, 0.4)');
-                gradient.addColorStop(1, 'rgba(0, 255, 170, 0)');
-                ctx.fillStyle = gradient;
-                ctx.beginPath();
-                ctx.arc(x, y, 8, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = '#00ffaa';
-                ctx.beginPath();
-                ctx.arc(x, y, 4, 0, Math.PI * 2);
-                ctx.fill();
-            });
-
             // Axis titles
-            ctx.fillStyle = '#e8edf4';
+            ctx.fillStyle = '#1a1a1a';
             ctx.font = '14px Barlow';
             ctx.textAlign = 'center';
             ctx.fillText('Asse X', width / 2, height - 10);
