@@ -633,16 +633,10 @@
                 return;
             }
 
-            // Applica offset Y ai dati
-            const dataWithOffset = chartState.data.map(p => ({
-                x: p.x,
-                y: p.y + chartState.offsetY
-            }));
-
-            let minX = Math.min(...dataWithOffset.map(p => p.x));
-            let maxX = Math.max(...dataWithOffset.map(p => p.x));
-            let minY = Math.min(...dataWithOffset.map(p => p.y));
-            let maxY = Math.max(...dataWithOffset.map(p => p.y));
+            // Calcola assi X e Y sui dati ORIGINALI (senza offset)
+            let minX = Math.min(...chartState.data.map(p => p.x));
+            let maxX = Math.max(...chartState.data.map(p => p.x));
+            let maxY = Math.max(...chartState.data.map(p => p.y));
 
             // AutoScale X con margine 10% e zoom
             const rangeX = maxX - minX;
@@ -655,9 +649,15 @@
             minX -= marginX;
             maxX += marginX;
 
-            // Asse Y: da 0 a max(y) * 1.25
-            minY = 0;
+            // Asse Y: da 0 a max(y) * 1.25 (sui dati originali, asse fisso)
+            let minY = 0;
             maxY = maxY * 1.25;
+
+            // Applica offset Y ai dati per disegnare (l'asse rimane fisso)
+            const dataWithOffset = chartState.data.map(p => ({
+                x: p.x,
+                y: p.y + chartState.offsetY
+            }));
 
             // Grid
             ctx.strokeStyle = '#2a3447';
