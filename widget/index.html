@@ -308,7 +308,7 @@
         </div>
 
         <div class="controls-panel">
-            <!-- Upload DXF & Data -->
+            <!-- Upload DXF & CSV -->
             <div class="control-group">
                 <h3>📊 Dati</h3>
                 <div class="file-upload-wrapper">
@@ -317,10 +317,13 @@
                         📁 Carica File DXF
                     </label>
                 </div>
+                <div class="file-upload-wrapper" style="margin-top: 8px;">
+                    <input type="file" id="csvFileInput" accept=".csv" onchange="handleCSVUpload(event)">
+                    <label for="csvFileInput" class="file-upload-label">
+                        📄 Carica File CSV
+                    </label>
+                </div>
                 <div class="file-name-display" id="fileName">Nessun file selezionato</div>
-                <button class="control-btn full-width" onclick="loadCSVData()" style="margin-top: 12px;">
-                    <span>🔄 Ricarica CSV</span>
-                </button>
                 <button class="control-btn full-width" onclick="downloadCSV()" style="margin-top: 8px;">
                     <span>💾 Esporta CSV</span>
                 </button>
@@ -787,6 +790,31 @@
             ctx.fillText('L2: ' + chartState.line2X.toFixed(1), line2ScreenX + 5, padding + 30);
         }
 
+        // ===== FILE UPLOAD =====
+
+        function handleCSVUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            console.log('=== CARICAMENTO NUOVO CSV DA FILE ===');
+            console.log('File:', file.name);
+
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('connectionStatus').textContent = 'Caricamento CSV...';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const csvText = e.target.result;
+                    parseCSV(csvText);
+                } catch (error) {
+                    console.error('Errore lettura file CSV:', error);
+                    document.getElementById('connectionStatus').textContent = 'ERRORE: ' + error.message;
+                }
+            };
+            reader.readAsText(file);
+        }
+
         // ===== DXF PARSING =====
 
         function handleDXFUpload(event) {
@@ -895,6 +923,7 @@
                 let splineCount = 0;
                 let lineCount = 0;
                 let arcCount = 0;
+                let circleCount = 0;
                 let polylineCount = 0;
                 let ignoredCount = 0;
 
@@ -914,6 +943,10 @@
                         arcCount++;
                         console.log('Processando Arc #' + arcCount, entity);
                         processArcNative(entity, xPoints, yPoints);
+                    } else if (entity.type === 'CIRCLE') {
+                        circleCount++;
+                        console.log('Processando Circle #' + circleCount, entity);
+                        processCircleNative(entity, xPoints, yPoints);
                     } else if (entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') {
                         polylineCount++;
                         console.log('Processando Polyline #' + polylineCount, entity);
@@ -925,7 +958,7 @@
                 });
 
                 console.log('Punti totali generati (prima della scala):', xPoints.length);
-                console.log('Splines:', splineCount, 'Lines:', lineCount, 'Arcs:', arcCount, 'Polylines:', polylineCount, 'Ignorati:', ignoredCount);
+                console.log('Splines:', splineCount, 'Lines:', lineCount, 'Arcs:', arcCount, 'Circles:', circleCount, 'Polylines:', polylineCount, 'Ignorati:', ignoredCount);
 
                 if (xPoints.length === 0) {
                     const errorMsg = `DXF processato ma nessun punto estratto. Entità trovate: ${dxf.entities.length}. Controllare console per dettagli.`;
@@ -963,6 +996,7 @@
                 if (splineCount > 0) parts.push(`${splineCount} splines`);
                 if (lineCount > 0) parts.push(`${lineCount} linee`);
                 if (arcCount > 0) parts.push(`${arcCount} archi`);
+                if (circleCount > 0) parts.push(`${circleCount} cerchi`);
                 if (polylineCount > 0) parts.push(`${polylineCount} polylines`);
                 if (parts.length > 0) successMsg += ` (${parts.join(', ')})`;
 
@@ -1017,6 +1051,24 @@
                 endAngle: endAngle
             };
             interpolateArc(arc, xPoints, yPoints);
+        }
+
+        function processCircleNative(entity, xPoints, yPoints) {
+            // CIRCLE: 10,20 (center), 40 (radius)
+            const cx = entity.data[10] ? parseFloat(entity.data[10][0]) : 0;
+            const cy = entity.data[20] ? parseFloat(entity.data[20][0]) : 0;
+            const radius = entity.data[40] ? parseFloat(entity.data[40][0]) : 0;
+
+            console.log('  CIRCLE centro (' + cx + ',' + cy + ') raggio ' + radius);
+
+            // Un cerchio è un arco completo da 0 a 360 gradi
+            const circle = {
+                center: { x: cx, y: cy },
+                radius: radius,
+                startAngle: 0,
+                endAngle: 360
+            };
+            interpolateArc(circle, xPoints, yPoints);
         }
 
         function processPolylineNative(entity, xPoints, yPoints) {
