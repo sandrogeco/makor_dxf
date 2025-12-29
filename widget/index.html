@@ -1419,6 +1419,28 @@
         }
 
         // ===== MOUSE DRAG PER LINEE VERTICALI =====
+        // Helper function per calcolare il range X visibile con zoom applicato
+        function getVisibleXRange() {
+            // Calcola range dati completo
+            let minX = Math.min(...chartState.data.map(p => p.x));
+            let maxX = Math.max(...chartState.data.map(p => p.x));
+
+            // Applica range selector X (zoom)
+            const dataMinX = minX;
+            const dataMaxX = maxX;
+            const dataRangeX = dataMaxX - dataMinX;
+
+            minX = dataMinX + (dataRangeX * chartState.xRangeMin / 100);
+            maxX = dataMinX + (dataRangeX * chartState.xRangeMax / 100);
+
+            // Aggiungi margine 10%
+            const marginX = (maxX - minX) * 0.1;
+            minX -= marginX;
+            maxX += marginX;
+
+            return { minX, maxX };
+        }
+
         canvas.addEventListener('mousedown', function(e) {
             if (chartState.data.length === 0) return;
 
@@ -1428,13 +1450,8 @@
             const padding = 60;
             const width = rect.width;
 
-            // Calcola posizioni linee sullo schermo
-            const dataWithOffset = chartState.data.map(p => ({ x: p.x, y: p.y + chartState.offsetY }));
-            let minX = Math.min(...dataWithOffset.map(p => p.x));
-            let maxX = Math.max(...dataWithOffset.map(p => p.x));
-            const rangeX = maxX - minX;
-            minX -= rangeX * 0.1;
-            maxX += rangeX * 0.1;
+            // Calcola posizioni linee sullo schermo con zoom applicato
+            const { minX, maxX } = getVisibleXRange();
 
             const transformX = (x) => padding + (width - 2 * padding) * ((x - minX) / (maxX - minX));
             const line1ScreenX = transformX(chartState.line1X);
@@ -1459,13 +1476,8 @@
             const width = rect.width;
 
             if (isDraggingLine) {
-                // Calcola valore X dai dati
-                const dataWithOffset = chartState.data.map(p => ({ x: p.x, y: p.y + chartState.offsetY }));
-                let minX = Math.min(...dataWithOffset.map(p => p.x));
-                let maxX = Math.max(...dataWithOffset.map(p => p.x));
-                const rangeX = maxX - minX;
-                minX -= rangeX * 0.1;
-                maxX += rangeX * 0.1;
+                // Calcola valore X dai dati con zoom applicato
+                const { minX, maxX } = getVisibleXRange();
 
                 const dataX = minX + (maxX - minX) * ((mouseX - padding) / (width - 2 * padding));
 
@@ -1480,13 +1492,8 @@
                 updateUI();
                 drawChart();
             } else {
-                // Mostra cursore resize se vicino a una linea
-                const dataWithOffset = chartState.data.map(p => ({ x: p.x, y: p.y + chartState.offsetY }));
-                let minX = Math.min(...dataWithOffset.map(p => p.x));
-                let maxX = Math.max(...dataWithOffset.map(p => p.x));
-                const rangeX = maxX - minX;
-                minX -= rangeX * 0.1;
-                maxX += rangeX * 0.1;
+                // Mostra cursore resize se vicino a una linea con zoom applicato
+                const { minX, maxX } = getVisibleXRange();
 
                 const transformX = (x) => padding + (width - 2 * padding) * ((x - minX) / (maxX - minX));
                 const line1ScreenX = transformX(chartState.line1X);
