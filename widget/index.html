@@ -686,6 +686,18 @@
             }
         }
 
+        // Funzione per determinare il numero di decimali appropriato in base al range
+        function getDecimalPlaces(range) {
+            if (range === 0) return 1;
+            const absRange = Math.abs(range);
+            if (absRange >= 100) return 0;
+            if (absRange >= 10) return 1;
+            if (absRange >= 1) return 2;
+            if (absRange >= 0.1) return 3;
+            if (absRange >= 0.01) return 4;
+            return 5;
+        }
+
         function drawChart() {
             console.log('drawChart() chiamato. Punti disponibili:', chartState.data.length);
 
@@ -769,17 +781,23 @@
             ctx.font = '12px JetBrains Mono';
             ctx.textAlign = 'center';
 
+            // Calcola decimali appropriati per assi X e Y
+            const rangeX = maxX - minX;
+            const rangeY = maxY - minY;
+            const decimalsX = getDecimalPlaces(rangeX);
+            const decimalsY = getDecimalPlaces(rangeY);
+
             for (let i = 0; i <= 5; i++) {
                 const x = padding + (width - 2 * padding) * (i / 5);
                 const value = minX + (maxX - minX) * (i / 5);
-                ctx.fillText(value.toFixed(1), x, height - padding + 20);
+                ctx.fillText(value.toFixed(decimalsX), x, height - padding + 20);
             }
 
             ctx.textAlign = 'right';
             for (let i = 0; i <= 5; i++) {
                 const y = height - padding - (height - 2 * padding) * (i / 5);
                 const value = minY + (maxY - minY) * (i / 5);
-                ctx.fillText(value.toFixed(1), padding - 10, y + 4);
+                ctx.fillText(value.toFixed(decimalsY), padding - 10, y + 4);
             }
 
             const transformX = (x) => padding + (width - 2 * padding) * ((x - minX) / (maxX - minX));
@@ -846,7 +864,7 @@
             ctx.fillStyle = '#ff4444';
             ctx.font = '11px JetBrains Mono';
             ctx.textAlign = 'left';
-            ctx.fillText('L1: ' + chartState.line1X.toFixed(1), line1ScreenX + 5, padding + 15);
+            ctx.fillText('L1: ' + chartState.line1X.toFixed(decimalsX), line1ScreenX + 5, padding + 15);
 
             // Linea 2 (verde)
             ctx.strokeStyle = '#44ff44';
@@ -862,7 +880,7 @@
             ctx.fillStyle = '#44ff44';
             ctx.font = '11px JetBrains Mono';
             ctx.textAlign = 'left';
-            ctx.fillText('L2: ' + chartState.line2X.toFixed(1), line2ScreenX + 5, padding + 30);
+            ctx.fillText('L2: ' + chartState.line2X.toFixed(decimalsX), line2ScreenX + 5, padding + 30);
         }
 
         // ===== FILE UPLOAD =====
@@ -1203,8 +1221,23 @@
             const startLength = xPoints.length;
 
             // Genera punti poligonali dalla spline (per approssimare la curva liscia)
-            // Numero di punti proporzionale al numero di control points (indipendente da INTERPOLATION_STEP)
-            const numPolygonalPoints = Math.max(50, xs.length * 20);
+            // Genera abbastanza punti poligonali in modo che l'interpolazione finale produca risultati fluidi
+            // Calcoliamo il numero in base al range della spline e allo step di interpolazione
+            const xValues = xs.map(x => parseFloat(x));
+            const yValues = ys.map(y => parseFloat(y));
+            const rangeX = Math.max(...xValues) - Math.min(...xValues);
+            const rangeY = Math.max(...yValues) - Math.min(...yValues);
+            const approxLength = Math.max(rangeX, rangeY) * 1.5; // Stima conservativa della lunghezza della curva
+
+            // Genera almeno 10x i punti finali desiderati per avere una curva liscia
+            let numPolygonalPoints;
+            if (INTERPOLATION_MODE === 'deltaX') {
+                numPolygonalPoints = Math.max(100, Math.floor(rangeX / INTERPOLATION_STEP * 10));
+            } else {
+                numPolygonalPoints = Math.max(100, Math.floor(approxLength / INTERPOLATION_STEP * 10));
+            }
+            numPolygonalPoints = Math.min(numPolygonalPoints, 100000); // Limita massimo
+
             const polygonalPoints = generatePolygonalVertices(xs, ys, closed, numPolygonalPoints);
 
             console.log('  Generati ' + polygonalPoints.length + ' punti poligonali dalla spline');
