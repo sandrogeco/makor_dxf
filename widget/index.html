@@ -678,8 +678,15 @@
                 const maxX = Math.max(...xValues);
                 const minY = Math.min(...yValues);
                 const maxY = Math.max(...yValues);
-                document.getElementById('rangeX').textContent = minX.toFixed(1) + ' ~ ' + maxX.toFixed(1);
-                document.getElementById('rangeY').textContent = minY.toFixed(1) + ' ~ ' + maxY.toFixed(1);
+
+                // Calcola decimali appropriati in base ai range
+                const rangeX = maxX - minX;
+                const rangeY = maxY - minY;
+                const decimalsX = getDecimalPlaces(rangeX);
+                const decimalsY = getDecimalPlaces(rangeY);
+
+                document.getElementById('rangeX').textContent = minX.toFixed(decimalsX) + ' ~ ' + maxX.toFixed(decimalsX);
+                document.getElementById('rangeY').textContent = minY.toFixed(decimalsY) + ' ~ ' + maxY.toFixed(decimalsY);
             } else {
                 document.getElementById('rangeX').textContent = '-';
                 document.getElementById('rangeY').textContent = '-';
