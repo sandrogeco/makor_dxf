@@ -424,8 +424,24 @@
                            oninput="setInterpolationStep(this.value)"
                            style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">
                 </div>
+
+                <!-- Modalità Interpolazione -->
+                <div style="margin-top: 12px;">
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Modalità:</div>
+                    <label style="display: flex; align-items: center; margin-bottom: 4px; cursor: pointer; font-size: 12px;">
+                        <input type="radio" name="interpolationMode" value="geometric" checked onchange="setInterpolationMode(this.value)"
+                               style="margin-right: 6px;">
+                        <span>Su lunghezza geometrica</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer; font-size: 12px;">
+                        <input type="radio" name="interpolationMode" value="deltaX" onchange="setInterpolationMode(this.value)"
+                               style="margin-right: 6px;">
+                        <span>Su delta X (asse orizzontale)</span>
+                    </label>
+                </div>
+
                 <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
-                    Più basso = più punti (ricarica DXF dopo modifica)
+                    Punti generati: <span id="generatedPointsCount" style="color: var(--accent-color); font-weight: bold;">0</span>
                 </div>
             </div>
 
@@ -491,6 +507,7 @@
         };
 
         let INTERPOLATION_STEP = 0.005;
+        let INTERPOLATION_MODE = 'geometric'; // 'geometric' o 'deltaX'
         const SCALE_FACTOR = 1000.0;
 
         // Salva l'ultimo file caricato per refresh automatico
@@ -625,6 +642,13 @@
             reloadLastFile();
         }
 
+        function setInterpolationMode(mode) {
+            INTERPOLATION_MODE = mode;
+            console.log('Modalità interpolazione:', mode);
+            updateUI();
+            reloadLastFile();
+        }
+
         function setLine1X(value) {
             chartState.line1X = parseFloat(value) || 0;
             updateUI();
@@ -639,6 +663,7 @@
 
         function updateUI() {
             document.getElementById('dataPointsCount').textContent = chartState.data.length;
+            document.getElementById('generatedPointsCount').textContent = chartState.data.length;
             document.getElementById('offsetYValue').textContent = chartState.offsetY.toFixed(0);
             document.getElementById('currentOffsetY').textContent = chartState.offsetY.toFixed(0);
             document.getElementById('interpolationValue').textContent = INTERPOLATION_STEP.toFixed(3);
@@ -1340,11 +1365,29 @@
         function interpolateLine(x1, y1, x2, y2, xPoints, yPoints) {
             const dx = x2 - x1;
             const dy = y2 - y1;
-            const length = Math.sqrt(dx * dx + dy * dy);
 
-            if (length < 0.0001) return;
+            let numSegments;
 
-            const numSegments = Math.max(1, Math.floor(length / INTERPOLATION_STEP));
+            if (INTERPOLATION_MODE === 'deltaX') {
+                // Interpolazione basata sul delta X
+                const deltaX = Math.abs(dx);
+                if (deltaX < 0.0001) {
+                    // Linea verticale, aggiungi solo i due estremi
+                    xPoints.push(x1);
+                    yPoints.push(y1);
+                    if (Math.abs(dy) > 0.0001) {
+                        xPoints.push(x2);
+                        yPoints.push(y2);
+                    }
+                    return;
+                }
+                numSegments = Math.max(1, Math.floor(deltaX / INTERPOLATION_STEP));
+            } else {
+                // Interpolazione basata sulla lunghezza geometrica
+                const length = Math.sqrt(dx * dx + dy * dy);
+                if (length < 0.0001) return;
+                numSegments = Math.max(1, Math.floor(length / INTERPOLATION_STEP));
+            }
 
             for (let i = 0; i <= numSegments; i++) {
                 const t = i / numSegments;
@@ -1361,8 +1404,37 @@
             while (endAngle < startAngle) endAngle += 360;
 
             const angleRange = endAngle - startAngle;
-            const arcLength = arc.radius * (angleRange * Math.PI / 180.0);
-            const numSegments = Math.max(2, Math.floor(arcLength / INTERPOLATION_STEP));
+            let numSegments;
+
+            if (INTERPOLATION_MODE === 'deltaX') {
+                // Interpolazione basata sul delta X
+                // Calcola punti iniziale e finale dell'arco
+                const startAngleRad = startAngle * Math.PI / 180.0;
+                const endAngleRad = endAngle * Math.PI / 180.0;
+                const x1 = arc.center.x + arc.radius * Math.cos(startAngleRad);
+                const x2 = arc.center.x + arc.radius * Math.cos(endAngleRad);
+
+                // Trova il range X dell'arco (considera tutti i punti dell'arco)
+                // Per un arco completo o parziale, dobbiamo considerare i punti critici (0°, 90°, 180°, 270°)
+                let minX = Math.min(x1, x2);
+                let maxX = Math.max(x1, x2);
+
+                // Controlla se l'arco attraversa 0° (destra, x massimo)
+                if (startAngle <= 0 && endAngle >= 0 || startAngle <= 360 && endAngle >= 360) {
+                    maxX = Math.max(maxX, arc.center.x + arc.radius);
+                }
+                // Controlla se l'arco attraversa 180° (sinistra, x minimo)
+                if (startAngle <= 180 && endAngle >= 180) {
+                    minX = Math.min(minX, arc.center.x - arc.radius);
+                }
+
+                const deltaX = maxX - minX;
+                numSegments = Math.max(2, Math.floor(deltaX / INTERPOLATION_STEP));
+            } else {
+                // Interpolazione basata sulla lunghezza geometrica (arcLength)
+                const arcLength = arc.radius * (angleRange * Math.PI / 180.0);
+                numSegments = Math.max(2, Math.floor(arcLength / INTERPOLATION_STEP));
+            }
 
             for (let i = 0; i <= numSegments; i++) {
                 const t = i / numSegments;
