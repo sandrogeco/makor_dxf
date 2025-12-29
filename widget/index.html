@@ -1220,55 +1220,104 @@
 
             const startLength = xPoints.length;
 
-            // Genera punti poligonali dalla spline (per approssimare la curva liscia)
-            // Genera abbastanza punti poligonali in modo che l'interpolazione finale produca risultati fluidi
-            // Calcoliamo il numero in base al range della spline e allo step di interpolazione
-            const xValues = xs.map(x => parseFloat(x));
-            const yValues = ys.map(y => parseFloat(y));
-            const rangeX = Math.max(...xValues) - Math.min(...xValues);
-            const rangeY = Math.max(...yValues) - Math.min(...yValues);
-            const approxLength = Math.max(rangeX, rangeY) * 1.5; // Stima conservativa della lunghezza della curva
+            // Genera una rappresentazione ad alta risoluzione della spline (curva liscia)
+            const highResPoints = generatePolygonalVertices(xs, ys, closed, 5000);
 
-            // Genera almeno 10x i punti finali desiderati per avere una curva liscia
-            let numPolygonalPoints;
+            if (highResPoints.length === 0) {
+                console.warn('  SPLINE: nessun punto generato');
+                return;
+            }
+
+            console.log('  Generati ' + highResPoints.length + ' punti ad alta risoluzione');
+
             if (INTERPOLATION_MODE === 'deltaX') {
-                numPolygonalPoints = Math.max(100, Math.floor(rangeX / INTERPOLATION_STEP * 10));
+                // Modalità DELTA X: campiona la curva a intervalli regolari sull'asse X
+                sampleSplineByX(highResPoints, xPoints, yPoints, INTERPOLATION_STEP);
             } else {
-                numPolygonalPoints = Math.max(100, Math.floor(approxLength / INTERPOLATION_STEP * 10));
-            }
-            numPolygonalPoints = Math.min(numPolygonalPoints, 100000); // Limita massimo
-
-            const polygonalPoints = generatePolygonalVertices(xs, ys, closed, numPolygonalPoints);
-
-            console.log('  Generati ' + polygonalPoints.length + ' punti poligonali dalla spline');
-
-            // Ora interpola tra i punti poligonali usando interpolateLine()
-            // Questo rispetterà automaticamente INTERPOLATION_MODE e INTERPOLATION_STEP
-            for (let i = 0; i < polygonalPoints.length - 1; i++) {
-                interpolateLine(
-                    polygonalPoints[i].x,
-                    polygonalPoints[i].y,
-                    polygonalPoints[i + 1].x,
-                    polygonalPoints[i + 1].y,
-                    xPoints,
-                    yPoints
-                );
-            }
-
-            // Se chiusa, collega ultimo a primo
-            if (closed && polygonalPoints.length > 1) {
-                interpolateLine(
-                    polygonalPoints[polygonalPoints.length - 1].x,
-                    polygonalPoints[polygonalPoints.length - 1].y,
-                    polygonalPoints[0].x,
-                    polygonalPoints[0].y,
-                    xPoints,
-                    yPoints
-                );
+                // Modalità GEOMETRICA: campiona la curva a intervalli regolari di lunghezza
+                sampleSplineByLength(highResPoints, xPoints, yPoints, INTERPOLATION_STEP);
             }
 
             const addedPoints = xPoints.length - startLength;
             console.log('  SPLINE processata. Punti aggiunti:', addedPoints);
+        }
+
+        // Campiona una spline ad alta risoluzione a intervalli regolari sull'asse X
+        function sampleSplineByX(highResPoints, xPoints, yPoints, step) {
+            // Trova range X
+            const allX = highResPoints.map(p => p.x);
+            const minX = Math.min(...allX);
+            const maxX = Math.max(...allX);
+
+            // Per ogni valore X desiderato, trova Y sulla curva
+            for (let targetX = minX; targetX <= maxX; targetX += step) {
+                // Trova il segmento della curva che contiene targetX
+                for (let i = 0; i < highResPoints.length - 1; i++) {
+                    const p1 = highResPoints[i];
+                    const p2 = highResPoints[i + 1];
+
+                    // Controlla se targetX è compreso tra p1.x e p2.x (gestisce direzione)
+                    const minSegX = Math.min(p1.x, p2.x);
+                    const maxSegX = Math.max(p1.x, p2.x);
+
+                    if (targetX >= minSegX && targetX <= maxSegX) {
+                        // Interpola linearmente per trovare Y
+                        const t = Math.abs(p2.x - p1.x) < 0.00001 ? 0 : (targetX - p1.x) / (p2.x - p1.x);
+                        const y = p1.y + t * (p2.y - p1.y);
+                        xPoints.push(targetX);
+                        yPoints.push(y);
+                        break;
+                    }
+                }
+            }
+
+            // Aggiungi sempre l'ultimo punto
+            if (highResPoints.length > 0) {
+                const last = highResPoints[highResPoints.length - 1];
+                if (xPoints.length === 0 || Math.abs(xPoints[xPoints.length - 1] - last.x) > step / 2) {
+                    xPoints.push(last.x);
+                    yPoints.push(last.y);
+                }
+            }
+        }
+
+        // Campiona una spline ad alta risoluzione a intervalli regolari di lunghezza
+        function sampleSplineByLength(highResPoints, xPoints, yPoints, step) {
+            if (highResPoints.length === 0) return;
+
+            // Aggiungi sempre il primo punto
+            xPoints.push(highResPoints[0].x);
+            yPoints.push(highResPoints[0].y);
+
+            let accumulatedLength = 0;
+            let nextSampleAt = step;
+
+            for (let i = 0; i < highResPoints.length - 1; i++) {
+                const p1 = highResPoints[i];
+                const p2 = highResPoints[i + 1];
+
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const segmentLength = Math.sqrt(dx * dx + dy * dy);
+
+                while (accumulatedLength + segmentLength >= nextSampleAt) {
+                    // Interpola sul segmento corrente
+                    const remainingDist = nextSampleAt - accumulatedLength;
+                    const t = segmentLength < 0.00001 ? 0 : remainingDist / segmentLength;
+                    const x = p1.x + t * dx;
+                    const y = p1.y + t * dy;
+                    xPoints.push(x);
+                    yPoints.push(y);
+                    nextSampleAt += step;
+                }
+
+                accumulatedLength += segmentLength;
+            }
+
+            // Aggiungi sempre l'ultimo punto
+            const last = highResPoints[highResPoints.length - 1];
+            xPoints.push(last.x);
+            yPoints.push(last.y);
         }
 
         // Genera punti poligonali da una spline usando interpolazione Catmull-Rom
