@@ -508,7 +508,6 @@
 
         let INTERPOLATION_STEP = 0.005;
         let INTERPOLATION_MODE = 'geometric'; // 'geometric' o 'deltaX'
-        const SCALE_FACTOR = 1000.0;
 
         // Salva l'ultimo file caricato per refresh automatico
         let lastDxfString = null;
@@ -981,7 +980,6 @@
                 console.log('File:', fileName);
                 console.log('Dimensione file:', dxfString.length, 'caratteri');
                 console.log('Passo interpolazione:', INTERPOLATION_STEP);
-                console.log('Fattore scala:', SCALE_FACTOR);
 
                 const dxf = parseDXFNative(dxfString);
 
@@ -1047,13 +1045,7 @@
                     throw new Error(errorMsg);
                 }
 
-                // Applica fattore di scala
-                for (let i = 0; i < xPoints.length; i++) {
-                    xPoints[i] *= SCALE_FACTOR;
-                    yPoints[i] *= SCALE_FACTOR;
-                }
-
-                console.log('Scala applicata.');
+                console.log('Punti estratti.');
                 console.log('X:', Math.min(...xPoints).toFixed(2), 'to', Math.max(...xPoints).toFixed(2));
                 console.log('Y:', Math.min(...yPoints).toFixed(2), 'to', Math.max(...yPoints).toFixed(2));
 
@@ -1210,44 +1202,36 @@
 
             const startLength = xPoints.length;
 
-            // Genera punti poligonali dalla spline con densità basata su modalità interpolazione
-            let numPolygonalPoints;
-
-            if (INTERPOLATION_MODE === 'deltaX') {
-                // Calcola range X della spline dai control points
-                const xValues = xs.map(x => parseFloat(x));
-                const minX = Math.min(...xValues);
-                const maxX = Math.max(...xValues);
-                const deltaX = maxX - minX;
-                // Genera punti con densità corretta (1 punto ogni step su X)
-                numPolygonalPoints = Math.max(50, Math.floor(deltaX / INTERPOLATION_STEP));
-                numPolygonalPoints = Math.min(numPolygonalPoints, 50000); // Limita massimo
-            } else {
-                // Stima lunghezza geometrica approssimativa sommando distanze tra control points
-                let approxLength = 0;
-                for (let i = 0; i < xs.length - 1; i++) {
-                    const dx = parseFloat(xs[i + 1]) - parseFloat(xs[i]);
-                    const dy = parseFloat(ys[i + 1]) - parseFloat(ys[i]);
-                    approxLength += Math.sqrt(dx * dx + dy * dy);
-                }
-                if (closed && xs.length > 1) {
-                    const dx = parseFloat(xs[0]) - parseFloat(xs[xs.length - 1]);
-                    const dy = parseFloat(ys[0]) - parseFloat(ys[ys.length - 1]);
-                    approxLength += Math.sqrt(dx * dx + dy * dy);
-                }
-                // Genera punti con densità corretta (1 punto ogni step di lunghezza)
-                numPolygonalPoints = Math.max(50, Math.floor(approxLength / INTERPOLATION_STEP));
-                numPolygonalPoints = Math.min(numPolygonalPoints, 50000); // Limita massimo
-            }
-
+            // Genera punti poligonali dalla spline (per approssimare la curva liscia)
+            // Numero di punti proporzionale al numero di control points (indipendente da INTERPOLATION_STEP)
+            const numPolygonalPoints = Math.max(50, xs.length * 20);
             const polygonalPoints = generatePolygonalVertices(xs, ys, closed, numPolygonalPoints);
 
-            console.log('  Generati ' + polygonalPoints.length + ' punti poligonali dalla spline (modalità: ' + INTERPOLATION_MODE + ')');
+            console.log('  Generati ' + polygonalPoints.length + ' punti poligonali dalla spline');
 
-            // Aggiungi i punti poligonali direttamente (hanno già la densità corretta)
-            for (let i = 0; i < polygonalPoints.length; i++) {
-                xPoints.push(polygonalPoints[i].x);
-                yPoints.push(polygonalPoints[i].y);
+            // Ora interpola tra i punti poligonali usando interpolateLine()
+            // Questo rispetterà automaticamente INTERPOLATION_MODE e INTERPOLATION_STEP
+            for (let i = 0; i < polygonalPoints.length - 1; i++) {
+                interpolateLine(
+                    polygonalPoints[i].x,
+                    polygonalPoints[i].y,
+                    polygonalPoints[i + 1].x,
+                    polygonalPoints[i + 1].y,
+                    xPoints,
+                    yPoints
+                );
+            }
+
+            // Se chiusa, collega ultimo a primo
+            if (closed && polygonalPoints.length > 1) {
+                interpolateLine(
+                    polygonalPoints[polygonalPoints.length - 1].x,
+                    polygonalPoints[polygonalPoints.length - 1].y,
+                    polygonalPoints[0].x,
+                    polygonalPoints[0].y,
+                    xPoints,
+                    yPoints
+                );
             }
 
             const addedPoints = xPoints.length - startLength;
