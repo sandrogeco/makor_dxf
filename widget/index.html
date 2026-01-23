@@ -500,6 +500,7 @@
     <script>
         let chartState = {
             data: [],
+            segments: [],   // Array di segmenti separati [{points: [{x,y}...]}, ...]
             offsetY: 0,
             line1X: 0,
             line2X: 100,
@@ -568,6 +569,7 @@
 
             // Reset offset Y a 0
             chartState.offsetY = 0;
+            chartState.segments = [];  // Reset segmenti (CSV è linea continua)
             document.getElementById('offsetYInput').value = 0;
 
             console.log('CSV salvato per refresh. lastLoadType:', lastLoadType);
@@ -823,17 +825,34 @@
             const transformX = (x) => padding + (width - 2 * padding) * ((x - minX) / (maxX - minX));
             const transformY = (y) => height - padding - (height - 2 * padding) * ((y - minY) / (maxY - minY));
 
-            // Line
+            // Line - disegna segmenti separati se disponibili
             ctx.strokeStyle = '#0066cc';
             ctx.lineWidth = 2;
-            ctx.beginPath();
-            dataWithOffset.forEach((point, index) => {
-                const x = transformX(point.x);
-                const y = transformY(point.y);
-                if (index === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            });
-            ctx.stroke();
+
+            if (chartState.segments && chartState.segments.length > 0) {
+                // Disegna ogni segmento separatamente (non li collega)
+                chartState.segments.forEach((segment, segIndex) => {
+                    ctx.beginPath();
+                    segment.points.forEach((point, index) => {
+                        const x = transformX(point.x);
+                        const y = transformY(point.y + chartState.offsetY);
+                        if (index === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    });
+                    ctx.stroke();
+                });
+                console.log('Disegnati', chartState.segments.length, 'segmenti separati');
+            } else {
+                // Fallback: disegna tutto come linea continua (per CSV)
+                ctx.beginPath();
+                dataWithOffset.forEach((point, index) => {
+                    const x = transformX(point.x);
+                    const y = transformY(point.y);
+                    if (index === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+            }
 
             // Axis titles
             ctx.fillStyle = '#1a1a1a';
@@ -1058,6 +1077,7 @@
 
                 let xPoints = [];
                 let yPoints = [];
+                let segments = [];  // Array di segmenti separati
                 let splineCount = 0;
                 let lineCount = 0;
                 let arcCount = 0;
@@ -1065,33 +1085,50 @@
                 let polylineCount = 0;
                 let ignoredCount = 0;
 
-                // Processa tutte le entità
+                // Processa tutte le entità - ogni entità è un segmento separato
                 dxf.entities.forEach(entity => {
                     console.log('Processando entità tipo:', entity.type);
+
+                    // Array temporanei per questa entità
+                    let entityXPoints = [];
+                    let entityYPoints = [];
 
                     if (entity.type === 'SPLINE') {
                         splineCount++;
                         console.log('Processando Spline #' + splineCount, entity);
-                        processSplineNative(entity, xPoints, yPoints);
+                        processSplineNative(entity, entityXPoints, entityYPoints);
                     } else if (entity.type === 'LINE') {
                         lineCount++;
                         console.log('Processando Line #' + lineCount, entity);
-                        processLineNative(entity, xPoints, yPoints);
+                        processLineNative(entity, entityXPoints, entityYPoints);
                     } else if (entity.type === 'ARC') {
                         arcCount++;
                         console.log('Processando Arc #' + arcCount, entity);
-                        processArcNative(entity, xPoints, yPoints);
+                        processArcNative(entity, entityXPoints, entityYPoints);
                     } else if (entity.type === 'CIRCLE') {
                         circleCount++;
                         console.log('Processando Circle #' + circleCount, entity);
-                        processCircleNative(entity, xPoints, yPoints);
+                        processCircleNative(entity, entityXPoints, entityYPoints);
                     } else if (entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') {
                         polylineCount++;
                         console.log('Processando Polyline #' + polylineCount, entity);
-                        processPolylineNative(entity, xPoints, yPoints);
+                        processPolylineNative(entity, entityXPoints, entityYPoints);
                     } else {
                         ignoredCount++;
                         console.log('Entità ignorata:', entity.type);
+                    }
+
+                    // Se questa entità ha prodotto punti, salvala come segmento separato
+                    if (entityXPoints.length > 0) {
+                        let segmentPoints = [];
+                        for (let i = 0; i < entityXPoints.length; i++) {
+                            segmentPoints.push({ x: entityXPoints[i], y: entityYPoints[i] });
+                            // Aggiungi anche all'array globale per compatibilità
+                            xPoints.push(entityXPoints[i]);
+                            yPoints.push(entityYPoints[i]);
+                        }
+                        segments.push({ points: segmentPoints, type: entity.type });
+                        console.log('  Segmento salvato con ' + segmentPoints.length + ' punti');
                     }
                 });
 
@@ -1123,7 +1160,14 @@
                     chartState.data.push({ x: xPoints[i], y: yPoints[i] });
                 }
 
+                // Salva i segmenti separati (normalizzati con lo stesso minYValue)
+                chartState.segments = segments.map(seg => ({
+                    type: seg.type,
+                    points: seg.points.map(p => ({ x: p.x, y: p.y - minYValue }))
+                }));
+
                 console.log('chartState.data popolato con', chartState.data.length, 'punti');
+                console.log('chartState.segments:', chartState.segments.length, 'segmenti separati');
                 console.log('Primi 3 punti:', chartState.data.slice(0, 3));
 
                 // Calcola statistiche
@@ -1586,26 +1630,47 @@
                 console.log('Limiti X:', minLimitX, 'a', maxLimitX);
                 console.log('Offset Y:', chartState.offsetY);
                 console.log('Punti totali:', chartState.data.length);
+                console.log('Segmenti:', chartState.segments ? chartState.segments.length : 0);
 
-                // Filtra punti compresi tra i limiti e applica offset Y
-                const filteredPoints = chartState.data.filter(point =>
-                    point.x >= minLimitX && point.x <= maxLimitX
-                );
+                let csv = 'X,Y,Segment\n';
+                let totalPoints = 0;
 
-                console.log('Punti filtrati:', filteredPoints.length);
+                // Se abbiamo segmenti separati, esportali con indicatore di segmento
+                if (chartState.segments && chartState.segments.length > 0) {
+                    chartState.segments.forEach((segment, segIndex) => {
+                        // Filtra punti del segmento compresi tra i limiti
+                        const filteredPoints = segment.points.filter(point =>
+                            point.x >= minLimitX && point.x <= maxLimitX
+                        );
 
-                if (filteredPoints.length === 0) {
+                        filteredPoints.forEach(point => {
+                            const x = point.x;
+                            const y = point.y + chartState.offsetY;  // Applica offset
+                            csv += x.toFixed(6) + ',' + y.toFixed(6) + ',' + (segIndex + 1) + '\n';
+                            totalPoints++;
+                        });
+                    });
+                } else {
+                    // Fallback: esporta come singola linea continua
+                    const filteredPoints = chartState.data.filter(point =>
+                        point.x >= minLimitX && point.x <= maxLimitX
+                    );
+
+                    filteredPoints.forEach(point => {
+                        const x = point.x;
+                        const y = point.y + chartState.offsetY;  // Applica offset
+                        csv += x.toFixed(6) + ',' + y.toFixed(6) + ',1\n';
+                        totalPoints++;
+                    });
+                }
+
+                console.log('Punti esportati:', totalPoints);
+
+                if (totalPoints === 0) {
                     console.warn('Range dati X:', Math.min(...chartState.data.map(p => p.x)), 'a', Math.max(...chartState.data.map(p => p.x)));
                     alert('Nessun punto compreso tra i limiti orizzontali.\nLimiti: ' + minLimitX.toFixed(2) + ' - ' + maxLimitX.toFixed(2));
                     return;
                 }
-
-                let csv = 'X,Y\n';
-                filteredPoints.forEach(point => {
-                    const x = point.x;
-                    const y = point.y + chartState.offsetY;  // Applica offset
-                    csv += x.toFixed(6) + ',' + y.toFixed(6) + '\n';
-                });
 
                 // Crea blob e scarica
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1622,8 +1687,9 @@
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
 
-                console.log('CSV scaricato: ' + filteredPoints.length + ' punti (da X=' + minLimitX.toFixed(2) + ' a X=' + maxLimitX.toFixed(2) + ', offset Y=' + chartState.offsetY + ')');
-                document.getElementById('connectionStatus').textContent = 'CSV esportato (' + filteredPoints.length + ' punti con offset)';
+                const segmentInfo = chartState.segments ? ' in ' + chartState.segments.length + ' segmenti' : '';
+                console.log('CSV scaricato: ' + totalPoints + ' punti' + segmentInfo + ' (da X=' + minLimitX.toFixed(2) + ' a X=' + maxLimitX.toFixed(2) + ', offset Y=' + chartState.offsetY + ')');
+                document.getElementById('connectionStatus').textContent = 'CSV esportato (' + totalPoints + ' punti' + segmentInfo + ')';
             } catch (error) {
                 console.error('Errore export CSV:', error);
                 alert('Errore durante l\'esportazione del CSV: ' + error.message);
