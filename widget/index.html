@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XY Chart - DXF CSV Viewer</title>
+    <!-- Polygon Offset Library for parallel curve offset -->
+    <script src="https://cdn.jsdelivr.net/npm/polygon-offset@0.3.2/dist/offset.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -569,7 +571,6 @@
 
             // Reset offset Y a 0
             chartState.offsetY = 0;
-            chartState.segments = [];  // Reset segmenti (CSV è linea continua)
             document.getElementById('offsetYInput').value = 0;
 
             console.log('CSV salvato per refresh. lastLoadType:', lastLoadType);
@@ -579,6 +580,7 @@
         function applyCSVData(csvText) {
             const lines = csvText.trim().split('\n');
             chartState.data = [];
+            chartState.segments = [];
 
             // Salta l'header (prima riga)
             for (let i = 1; i < lines.length; i++) {
@@ -596,14 +598,16 @@
                 }
             }
 
-            console.log('CSV parsato: ' + chartState.data.length + ' punti');
+            // Ordina per X crescente
+            chartState.data.sort((a, b) => a.x - b.x);
+
+            console.log('CSV parsato: ' + chartState.data.length + ' punti (ordinati per X)');
             document.getElementById('connectionStatus').textContent = 'CSV caricato (' + chartState.data.length + ' punti)';
 
             // Inizializza limiti orizzontali a min(x) e max(x)
             if (chartState.data.length > 0) {
-                const xValues = chartState.data.map(p => p.x);
-                const minX = Math.min(...xValues);
-                const maxX = Math.max(...xValues);
+                const minX = chartState.data[0].x;
+                const maxX = chartState.data[chartState.data.length - 1].x;
                 chartState.line1X = minX;
                 chartState.line2X = maxX;
                 document.getElementById('line1Input').value = minX.toFixed(3);
@@ -1629,48 +1633,38 @@
                 console.log('=== EXPORT CSV ===');
                 console.log('Limiti X:', minLimitX, 'a', maxLimitX);
                 console.log('Offset Y:', chartState.offsetY);
-                console.log('Punti totali:', chartState.data.length);
-                console.log('Segmenti:', chartState.segments ? chartState.segments.length : 0);
 
-                let csv = 'X,Y,Segment\n';
-                let totalPoints = 0;
-
-                // Se abbiamo segmenti separati, esportali con indicatore di segmento
+                // Raccogli tutti i punti (da segmenti o da data)
+                let allPoints = [];
                 if (chartState.segments && chartState.segments.length > 0) {
-                    chartState.segments.forEach((segment, segIndex) => {
-                        // Filtra punti del segmento compresi tra i limiti
-                        const filteredPoints = segment.points.filter(point =>
-                            point.x >= minLimitX && point.x <= maxLimitX
-                        );
-
-                        filteredPoints.forEach(point => {
-                            const x = point.x;
-                            const y = point.y + chartState.offsetY;  // Applica offset
-                            csv += x.toFixed(6) + ',' + y.toFixed(6) + ',' + (segIndex + 1) + '\n';
-                            totalPoints++;
+                    chartState.segments.forEach(segment => {
+                        segment.points.forEach(point => {
+                            allPoints.push({ x: point.x, y: point.y + chartState.offsetY });
                         });
                     });
                 } else {
-                    // Fallback: esporta come singola linea continua
-                    const filteredPoints = chartState.data.filter(point =>
-                        point.x >= minLimitX && point.x <= maxLimitX
-                    );
-
-                    filteredPoints.forEach(point => {
-                        const x = point.x;
-                        const y = point.y + chartState.offsetY;  // Applica offset
-                        csv += x.toFixed(6) + ',' + y.toFixed(6) + ',1\n';
-                        totalPoints++;
+                    chartState.data.forEach(point => {
+                        allPoints.push({ x: point.x, y: point.y + chartState.offsetY });
                     });
                 }
 
-                console.log('Punti esportati:', totalPoints);
+                // Filtra per limiti X e ordina per X crescente
+                allPoints = allPoints
+                    .filter(p => p.x >= minLimitX && p.x <= maxLimitX)
+                    .sort((a, b) => a.x - b.x);
 
-                if (totalPoints === 0) {
-                    console.warn('Range dati X:', Math.min(...chartState.data.map(p => p.x)), 'a', Math.max(...chartState.data.map(p => p.x)));
+                console.log('Punti da esportare:', allPoints.length);
+
+                if (allPoints.length === 0) {
                     alert('Nessun punto compreso tra i limiti orizzontali.\nLimiti: ' + minLimitX.toFixed(2) + ' - ' + maxLimitX.toFixed(2));
                     return;
                 }
+
+                // Crea CSV con solo X,Y
+                let csv = 'X,Y\n';
+                allPoints.forEach(point => {
+                    csv += point.x.toFixed(6) + ',' + point.y.toFixed(6) + '\n';
+                });
 
                 // Crea blob e scarica
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1687,9 +1681,8 @@
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
 
-                const segmentInfo = chartState.segments ? ' in ' + chartState.segments.length + ' segmenti' : '';
-                console.log('CSV scaricato: ' + totalPoints + ' punti' + segmentInfo + ' (da X=' + minLimitX.toFixed(2) + ' a X=' + maxLimitX.toFixed(2) + ', offset Y=' + chartState.offsetY + ')');
-                document.getElementById('connectionStatus').textContent = 'CSV esportato (' + totalPoints + ' punti' + segmentInfo + ')';
+                console.log('CSV scaricato: ' + allPoints.length + ' punti (X crescente)');
+                document.getElementById('connectionStatus').textContent = 'CSV esportato (' + allPoints.length + ' punti)';
             } catch (error) {
                 console.error('Errore export CSV:', error);
                 alert('Errore durante l\'esportazione del CSV: ' + error.message);
