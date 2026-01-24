@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XY Chart - DXF CSV Viewer</title>
-    <!-- Polygon Offset Library for parallel curve offset -->
-    <script src="https://cdn.jsdelivr.net/npm/polygon-offset@0.3.2/dist/offset.min.js"></script>
+    <title>XY Chart - DXF CSV Viewer v3.0</title>
+    <!-- JSTS - JavaScript Topology Suite for OffsetCurve -->
+    <script src="https://cdn.jsdelivr.net/npm/jsts@2.7.1/dist/jsts.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -398,21 +398,24 @@
                 </button>
             </div>
 
-            <!-- Offset Y -->
+            <!-- Offset Parallelo -->
             <div class="control-group">
-                <h3>↕️ Offset Verticale</h3>
+                <h3>↔️ Offset Parallelo</h3>
                 <div class="slider-container">
                     <div class="slider-label">
-                        <span>Offset Y</span>
+                        <span>Distanza</span>
                         <span class="slider-value" id="offsetYValue">0</span>
                     </div>
                     <input type="number" id="offsetYInput" value="0" step="0.005"
-                           oninput="setOffsetY(this.value)"
                            style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">
                 </div>
-                <button class="control-btn full-width" onclick="resetOffset()" style="margin-top: 8px;">
-                    <span>Reset Offset</span>
+                <button class="control-btn full-width" onclick="applyOffset()" style="margin-top: 8px; background: var(--accent-blue);">
+                    <span>🔧 Applica Offset</span>
                 </button>
+                <button class="control-btn full-width" onclick="resetOffset()" style="margin-top: 8px;">
+                    <span>Reset</span>
+                </button>
+                <div id="offsetLog" style="margin-top: 8px; font-size: 10px; color: var(--text-secondary); max-height: 80px; overflow-y: auto; font-family: 'JetBrains Mono', monospace;"></div>
             </div>
 
             <!-- Passo Interpolazione -->
@@ -503,6 +506,7 @@
         let chartState = {
             data: [],
             segments: [],   // Array di segmenti separati [{points: [{x,y}...]}, ...]
+            offsetProfile: null,  // Profilo dopo OffsetCurve JSTS
             offsetY: 0,
             line1X: 0,
             line2X: 100,
@@ -640,14 +644,93 @@
         function setOffsetY(value) {
             chartState.offsetY = parseFloat(value) || 0;
             updateUI();
-            reloadLastFile();
         }
 
         function resetOffset() {
             chartState.offsetY = 0;
+            chartState.offsetProfile = null;
             document.getElementById('offsetYInput').value = 0;
+            document.getElementById('offsetLog').innerHTML = '';
             updateUI();
-            reloadLastFile();
+            drawChart();
+        }
+
+        // Applica offset parallelo usando JSTS OffsetCurve
+        function applyOffset() {
+            const logDiv = document.getElementById('offsetLog');
+            const log = (msg) => {
+                console.log(msg);
+                logDiv.innerHTML += msg + '<br>';
+                logDiv.scrollTop = logDiv.scrollHeight;
+            };
+
+            logDiv.innerHTML = '';
+
+            const offsetDistance = parseFloat(document.getElementById('offsetYInput').value) || 0;
+            if (offsetDistance === 0) {
+                log('Offset = 0');
+                return;
+            }
+
+            log('Offset: ' + offsetDistance);
+
+            // Raccogli tutti i punti ordinati per X
+            let points = [];
+            if (chartState.segments && chartState.segments.length > 0) {
+                chartState.segments.forEach(seg => {
+                    seg.points.forEach(p => points.push({x: p.x, y: p.y}));
+                });
+            } else {
+                points = chartState.data.map(p => ({x: p.x, y: p.y}));
+            }
+
+            if (points.length < 2) {
+                log('Errore: pochi punti');
+                return;
+            }
+
+            points.sort((a, b) => a.x - b.x);
+            log('Punti: ' + points.length);
+
+            try {
+                if (typeof jsts === 'undefined') {
+                    log('Errore: JSTS non caricato');
+                    return;
+                }
+
+                // Crea LineString JSTS
+                const geomFactory = new jsts.geom.GeometryFactory();
+                const coords = points.map(p => new jsts.geom.Coordinate(p.x, p.y));
+                const lineString = geomFactory.createLineString(coords);
+
+                log('LineString creata');
+
+                // Applica OffsetCurve
+                const offsetCurve = jsts.operation.buffer.OffsetCurve.getCurve(lineString, offsetDistance);
+
+                log('OffsetCurve applicato');
+                log('Tipo: ' + offsetCurve.getGeometryType());
+
+                // Estrai coordinate
+                const resultCoords = offsetCurve.getCoordinates();
+                log('Punti risultato: ' + resultCoords.length);
+
+                // Converti in formato nostro
+                const offsetPoints = resultCoords.map(c => ({x: c.x, y: c.y}));
+                offsetPoints.sort((a, b) => a.x - b.x);
+
+                // Salva
+                chartState.offsetProfile = offsetPoints;
+                chartState.offsetY = offsetDistance;
+
+                log('OK! ' + offsetPoints.length + ' punti');
+
+                drawChart();
+
+            } catch (error) {
+                log('Errore: ' + error.message);
+                console.error('JSTS Error:', error);
+            }
         }
 
         function setInterpolationStep(value) {
@@ -856,6 +939,23 @@
                     else ctx.lineTo(x, y);
                 });
                 ctx.stroke();
+            }
+
+            // Disegna profilo offset se presente (dopo OffsetCurve JSTS)
+            if (chartState.offsetProfile && chartState.offsetProfile.length > 1) {
+                ctx.strokeStyle = '#00cc00';  // Verde per il profilo offset
+                ctx.lineWidth = 3;
+
+                ctx.beginPath();
+                chartState.offsetProfile.forEach((point, index) => {
+                    const x = transformX(point.x);
+                    const y = transformY(point.y);
+                    if (index === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+
+                console.log('Disegnato profilo offset con', chartState.offsetProfile.length, 'punti');
             }
 
             // Axis titles
