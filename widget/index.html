@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XY Chart - DXF CSV Viewer v3.0</title>
-    <!-- JSTS - JavaScript Topology Suite for OffsetCurve -->
-    <script src="https://cdn.jsdelivr.net/npm/jsts@2.7.1/dist/jsts.min.js"></script>
+    <title>XY Chart - DXF CSV Viewer</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -403,19 +401,18 @@
                 <h3>↔️ Offset Parallelo</h3>
                 <div class="slider-container">
                     <div class="slider-label">
-                        <span>Distanza</span>
+                        <span>Distanza Offset</span>
                         <span class="slider-value" id="offsetYValue">0</span>
                     </div>
-                    <input type="number" id="offsetYInput" value="0" step="0.005"
+                    <input type="number" id="offsetYInput" value="0" step="0.01"
                            style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">
                 </div>
-                <button class="control-btn full-width" onclick="applyOffset()" style="margin-top: 8px; background: var(--accent-blue);">
-                    <span>🔧 Applica Offset</span>
+                <button class="control-btn full-width" onclick="applyOffset()" style="margin-top: 8px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));">
+                    <span>Applica Offset</span>
                 </button>
                 <button class="control-btn full-width" onclick="resetOffset()" style="margin-top: 8px;">
                     <span>Reset</span>
                 </button>
-                <div id="offsetLog" style="margin-top: 8px; font-size: 10px; color: var(--text-secondary); max-height: 80px; overflow-y: auto; font-family: 'JetBrains Mono', monospace;"></div>
             </div>
 
             <!-- Passo Interpolazione -->
@@ -506,7 +503,7 @@
         let chartState = {
             data: [],
             segments: [],   // Array di segmenti separati [{points: [{x,y}...]}, ...]
-            offsetProfile: null,  // Profilo dopo OffsetCurve JSTS
+            offsetLines: [], // Rette parallele calcolate da applyOffset [{x1,y1,x2,y2}, ...]
             offsetY: 0,
             line1X: 0,
             line2X: 100,
@@ -641,96 +638,103 @@
             }
         }
 
-        function setOffsetY(value) {
-            chartState.offsetY = parseFloat(value) || 0;
-            updateUI();
-        }
-
         function resetOffset() {
             chartState.offsetY = 0;
-            chartState.offsetProfile = null;
+            chartState.offsetLines = [];
             document.getElementById('offsetYInput').value = 0;
-            document.getElementById('offsetLog').innerHTML = '';
             updateUI();
             drawChart();
         }
 
-        // Applica offset parallelo usando JSTS OffsetCurve
+        // Applica offset: per ogni segmento crea una retta parallela a distanza offset in Y+
         function applyOffset() {
-            const logDiv = document.getElementById('offsetLog');
-            const log = (msg) => {
-                console.log(msg);
-                logDiv.innerHTML += msg + '<br>';
-                logDiv.scrollTop = logDiv.scrollHeight;
-            };
+            const offset = parseFloat(document.getElementById('offsetYInput').value) || 0;
 
-            logDiv.innerHTML = '';
+            console.log('=== APPLICA OFFSET ===');
+            console.log('Distanza offset:', offset);
 
-            const offsetDistance = parseFloat(document.getElementById('offsetYInput').value) || 0;
-            if (offsetDistance === 0) {
-                log('Offset = 0');
-                return;
-            }
+            chartState.offsetLines = [];
 
-            log('Offset: ' + offsetDistance);
+            // Raccogli tutti i segmenti (coppie di punti consecutivi)
+            let allSegments = [];
 
-            // Raccogli tutti i punti ordinati per X
-            let points = [];
             if (chartState.segments && chartState.segments.length > 0) {
                 chartState.segments.forEach(seg => {
-                    seg.points.forEach(p => points.push({x: p.x, y: p.y}));
+                    for (let i = 0; i < seg.points.length - 1; i++) {
+                        allSegments.push({
+                            ax: seg.points[i].x,
+                            ay: seg.points[i].y,
+                            bx: seg.points[i + 1].x,
+                            by: seg.points[i + 1].y
+                        });
+                    }
                 });
-            } else {
-                points = chartState.data.map(p => ({x: p.x, y: p.y}));
+            } else if (chartState.data.length > 1) {
+                for (let i = 0; i < chartState.data.length - 1; i++) {
+                    allSegments.push({
+                        ax: chartState.data[i].x,
+                        ay: chartState.data[i].y,
+                        bx: chartState.data[i + 1].x,
+                        by: chartState.data[i + 1].y
+                    });
+                }
             }
 
-            if (points.length < 2) {
-                log('Errore: pochi punti');
-                return;
-            }
+            console.log('Segmenti trovati:', allSegments.length);
 
-            points.sort((a, b) => a.x - b.x);
-            log('Punti: ' + points.length);
+            // Range X per disegnare le rette "infinite"
+            const allX = chartState.data.map(p => p.x);
+            const minX = Math.min(...allX);
+            const maxX = Math.max(...allX);
+            const rangeX = maxX - minX;
+            const xStart = minX - rangeX * 5;
+            const xEnd = maxX + rangeX * 5;
 
-            try {
-                if (typeof jsts === 'undefined') {
-                    log('Errore: JSTS non caricato');
+            // Per ogni segmento ((ax,ay),(bx,by)):
+            // Calcolo m, q, poi q' = q + offset * sqrt(m² + 1)
+            // Per segmenti verticali uso approccio diverso
+            allSegments.forEach((seg, idx) => {
+                const { ax, ay, bx, by } = seg;
+                const dx = bx - ax;
+                const dy = by - ay;
+
+                console.log(`Seg ${idx}: (${ax.toFixed(4)},${ay.toFixed(4)}) -> (${bx.toFixed(4)},${by.toFixed(4)})`);
+
+                // Segmento verticale: retta parallela è x = ax + offset
+                if (Math.abs(dx) < 1e-10) {
+                    console.log(`  Verticale: x = ${ax.toFixed(6)}, offset x' = ${(ax + offset).toFixed(6)}`);
+                    chartState.offsetLines.push({
+                        x1: ax + offset,
+                        y1: -1000,
+                        x2: ax + offset,
+                        y2: 1000,
+                        vertical: true
+                    });
                     return;
                 }
 
-                // Crea LineString JSTS
-                const geomFactory = new jsts.geom.GeometryFactory();
-                const coords = points.map(p => new jsts.geom.Coordinate(p.x, p.y));
-                const lineString = geomFactory.createLineString(coords);
+                const m = dy / dx;
+                const q = ay - m * ax;
+                const qOffset = q + offset * Math.sqrt(m * m + 1);
 
-                log('LineString creata');
+                console.log(`  m=${m.toFixed(6)}, q=${q.toFixed(6)}`);
+                console.log(`  q'=${qOffset.toFixed(6)} (q + ${offset} * sqrt(${(m*m+1).toFixed(4)}) = q + ${(offset * Math.sqrt(m*m+1)).toFixed(6)})`);
 
-                // Applica OffsetCurve
-                const offsetCurve = jsts.operation.buffer.OffsetCurve.getCurve(lineString, offsetDistance);
+                // Retta offset: y = m*x + qOffset
+                const y1 = m * xStart + qOffset;
+                const y2 = m * xEnd + qOffset;
 
-                log('OffsetCurve applicato');
-                log('Tipo: ' + offsetCurve.getGeometryType());
+                chartState.offsetLines.push({
+                    x1: xStart,
+                    y1: y1,
+                    x2: xEnd,
+                    y2: y2
+                });
+            });
 
-                // Estrai coordinate
-                const resultCoords = offsetCurve.getCoordinates();
-                log('Punti risultato: ' + resultCoords.length);
-
-                // Converti in formato nostro
-                const offsetPoints = resultCoords.map(c => ({x: c.x, y: c.y}));
-                offsetPoints.sort((a, b) => a.x - b.x);
-
-                // Salva
-                chartState.offsetProfile = offsetPoints;
-                chartState.offsetY = offsetDistance;
-
-                log('OK! ' + offsetPoints.length + ' punti');
-
-                drawChart();
-
-            } catch (error) {
-                log('Errore: ' + error.message);
-                console.error('JSTS Error:', error);
-            }
+            console.log('Rette offset create:', chartState.offsetLines.length);
+            updateUI();
+            drawChart();
         }
 
         function setInterpolationStep(value) {
@@ -827,27 +831,43 @@
             }
 
             // Calcola assi X e Y sui dati ORIGINALI (senza offset)
-            let minX = Math.min(...chartState.data.map(p => p.x));
-            let maxX = Math.max(...chartState.data.map(p => p.x));
-            let maxY = Math.max(...chartState.data.map(p => p.y));
+            let dataMinX = Math.min(...chartState.data.map(p => p.x));
+            let dataMaxX = Math.max(...chartState.data.map(p => p.x));
+            let dataMinY = Math.min(...chartState.data.map(p => p.y));
+            let dataMaxY = Math.max(...chartState.data.map(p => p.y));
 
             // Applica range selector X (in percentuale 0-100)
-            const dataMinX = minX;
-            const dataMaxX = maxX;
-            const dataRangeX = dataMaxX - dataMinX;
+            const fullRangeX = dataMaxX - dataMinX;
+            let minX = dataMinX + (fullRangeX * chartState.xRangeMin / 100);
+            let maxX = dataMinX + (fullRangeX * chartState.xRangeMax / 100);
 
-            // Calcola minX e maxX basati sulle percentuali selezionate
-            minX = dataMinX + (dataRangeX * chartState.xRangeMin / 100);
-            maxX = dataMinX + (dataRangeX * chartState.xRangeMax / 100);
-
-            // Aggiungi margine 10%
+            // Margine 10%
             const marginX = (maxX - minX) * 0.1;
             minX -= marginX;
             maxX += marginX;
 
-            // Asse Y: da 0 a max(y) * 1.25 (sui dati originali, asse fisso)
-            let minY = 0;
-            maxY = maxY * 1.25;
+            // Range Y con margine
+            let minY = dataMinY - (dataMaxY - dataMinY) * 0.1;
+            let maxY = dataMaxY + (dataMaxY - dataMinY) * 0.1;
+            if (minY > 0) minY = 0; // Parti da 0 se i dati sono positivi
+
+            // SCALA UGUALE: calcola pixel per unità e usa lo stesso per entrambi gli assi
+            const plotWidth = width - 2 * padding;
+            const plotHeight = height - 2 * padding;
+            const rangeX = maxX - minX;
+            const rangeY = maxY - minY;
+
+            const scaleX = plotWidth / rangeX;   // pixel per unità X
+            const scaleY = plotHeight / rangeY;  // pixel per unità Y
+
+            // Usa la scala minore per entrambi (così tutto entra)
+            const scale = Math.min(scaleX, scaleY);
+
+            // Centra il grafico
+            const usedWidth = rangeX * scale;
+            const usedHeight = rangeY * scale;
+            const offsetX = (plotWidth - usedWidth) / 2;
+            const offsetY = (plotHeight - usedHeight) / 2;
 
             // Applica offset Y ai dati per disegnare (l'asse rimane fisso)
             const dataWithOffset = chartState.data.map(p => ({
@@ -890,27 +910,25 @@
             ctx.font = '12px JetBrains Mono';
             ctx.textAlign = 'center';
 
-            // Calcola decimali appropriati per assi X e Y
-            const rangeX = maxX - minX;
-            const rangeY = maxY - minY;
             const decimalsX = getDecimalPlaces(rangeX);
             const decimalsY = getDecimalPlaces(rangeY);
 
             for (let i = 0; i <= 5; i++) {
-                const x = padding + (width - 2 * padding) * (i / 5);
-                const value = minX + (maxX - minX) * (i / 5);
-                ctx.fillText(value.toFixed(decimalsX), x, height - padding + 20);
+                const screenX = padding + offsetX + usedWidth * (i / 5);
+                const value = minX + rangeX * (i / 5);
+                ctx.fillText(value.toFixed(decimalsX), screenX, height - padding + 20);
             }
 
             ctx.textAlign = 'right';
             for (let i = 0; i <= 5; i++) {
-                const y = height - padding - (height - 2 * padding) * (i / 5);
-                const value = minY + (maxY - minY) * (i / 5);
-                ctx.fillText(value.toFixed(decimalsY), padding - 10, y + 4);
+                const screenY = height - padding - offsetY - usedHeight * (i / 5);
+                const value = minY + rangeY * (i / 5);
+                ctx.fillText(value.toFixed(decimalsY), padding - 10, screenY + 4);
             }
 
-            const transformX = (x) => padding + (width - 2 * padding) * ((x - minX) / (maxX - minX));
-            const transformY = (y) => height - padding - (height - 2 * padding) * ((y - minY) / (maxY - minY));
+            // Transform con scala uguale per X e Y
+            const transformX = (x) => padding + offsetX + (x - minX) * scale;
+            const transformY = (y) => height - padding - offsetY - (y - minY) * scale;
 
             // Line - disegna segmenti separati se disponibili
             ctx.strokeStyle = '#0066cc';
@@ -941,21 +959,19 @@
                 ctx.stroke();
             }
 
-            // Disegna profilo offset se presente (dopo OffsetCurve JSTS)
-            if (chartState.offsetProfile && chartState.offsetProfile.length > 1) {
-                ctx.strokeStyle = '#00cc00';  // Verde per il profilo offset
-                ctx.lineWidth = 3;
+            // Disegna le rette offset (se presenti)
+            if (chartState.offsetLines && chartState.offsetLines.length > 0) {
+                ctx.strokeStyle = '#00cc00';  // Verde per le rette offset
+                ctx.lineWidth = 1;
 
-                ctx.beginPath();
-                chartState.offsetProfile.forEach((point, index) => {
-                    const x = transformX(point.x);
-                    const y = transformY(point.y);
-                    if (index === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
+                chartState.offsetLines.forEach((line, idx) => {
+                    ctx.beginPath();
+                    ctx.moveTo(transformX(line.x1), transformY(line.y1));
+                    ctx.lineTo(transformX(line.x2), transformY(line.y2));
+                    ctx.stroke();
                 });
-                ctx.stroke();
 
-                console.log('Disegnato profilo offset con', chartState.offsetProfile.length, 'punti');
+                console.log('Disegnate', chartState.offsetLines.length, 'rette offset');
             }
 
             // Axis titles
