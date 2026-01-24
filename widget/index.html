@@ -504,6 +504,7 @@
             data: [],
             segments: [],   // Array di segmenti separati [{points: [{x,y}...]}, ...]
             offsetLines: [], // Rette parallele calcolate da applyOffset [{x1,y1,x2,y2}, ...]
+            offsetPolyline: [], // Polilinea offset tagliata alle intersezioni [{x,y}, ...]
             offsetY: 0,
             line1X: 0,
             line2X: 100,
@@ -641,6 +642,7 @@
         function resetOffset() {
             chartState.offsetY = 0;
             chartState.offsetLines = [];
+            chartState.offsetPolyline = [];
             document.getElementById('offsetYInput').value = 0;
             updateUI();
             drawChart();
@@ -681,6 +683,25 @@
             }
 
             console.log('Segmenti trovati:', allSegments.length);
+
+            // Log ordine segmenti PRIMA dell'ordinamento
+            console.log('Segmenti PRIMA ordinamento:');
+            allSegments.forEach((seg, i) => {
+                console.log(`  ${i}: (${seg.ax.toFixed(4)},${seg.ay.toFixed(4)}) -> (${seg.bx.toFixed(4)},${seg.by.toFixed(4)})`);
+            });
+
+            // Ordina segmenti per X crescente (usa il minimo X tra ax e bx)
+            allSegments.sort((a, b) => {
+                const minXa = Math.min(a.ax, a.bx);
+                const minXb = Math.min(b.ax, b.bx);
+                return minXa - minXb;
+            });
+
+            // Log ordine segmenti DOPO l'ordinamento
+            console.log('Segmenti DOPO ordinamento (sx->dx):');
+            allSegments.forEach((seg, i) => {
+                console.log(`  ${i}: (${seg.ax.toFixed(4)},${seg.ay.toFixed(4)}) -> (${seg.bx.toFixed(4)},${seg.by.toFixed(4)})`);
+            });
 
             // Range X per disegnare le rette "infinite"
             const allX = chartState.data.map(p => p.x);
@@ -733,6 +754,120 @@
             });
 
             console.log('Rette offset create:', chartState.offsetLines.length);
+
+            // INTERSEZIONI: taglia i segmenti offset alle intersezioni
+            // so1, so2, so3... → intersezione so1∩so2 = io21, so2∩so3 = io32, ...
+            // so1 diventa (so1_start → io21)
+            // so2 diventa (io21 → io32)
+            // ecc.
+
+            if (chartState.offsetLines.length < 2) {
+                updateUI();
+                drawChart();
+                return;
+            }
+
+            const trimmedSegments = [];
+
+            for (let i = 0; i < chartState.offsetLines.length; i++) {
+                const so = chartState.offsetLines[i];
+
+                // Calcola m e q per questo segmento offset
+                // (già calcolati prima, ma li ricalcolo per coerenza)
+                const seg = allSegments[i];
+                const dx = seg.bx - seg.ax;
+                const dy = seg.by - seg.ay;
+
+                let m, q;
+                if (Math.abs(dx) < 1e-10) {
+                    // Segmento verticale
+                    m = Infinity;
+                    q = seg.ax + offset; // x = costante
+                } else {
+                    m = dy / dx;
+                    q = seg.ay - m * seg.ax + offset * Math.sqrt(m * m + 1);
+                }
+
+                trimmedSegments.push({
+                    m: m,
+                    q: q,
+                    // Punti iniziali e finali (verranno aggiornati con le intersezioni)
+                    xi: so.x1,
+                    yi: so.y1,
+                    xf: so.x2,
+                    yf: so.y2
+                });
+            }
+
+            // Calcola intersezioni tra segmenti adiacenti
+            const intersections = []; // io21, io32, io43, ...
+
+            for (let i = 0; i < trimmedSegments.length - 1; i++) {
+                const so1 = trimmedSegments[i];
+                const so2 = trimmedSegments[i + 1];
+
+                let ix, iy;
+
+                if (so1.m === Infinity && so2.m === Infinity) {
+                    // Entrambi verticali, nessuna intersezione
+                    ix = so1.q;
+                    iy = 0;
+                } else if (so1.m === Infinity) {
+                    // so1 verticale: x = so1.q
+                    ix = so1.q;
+                    iy = so2.m * ix + so2.q;
+                } else if (so2.m === Infinity) {
+                    // so2 verticale: x = so2.q
+                    ix = so2.q;
+                    iy = so1.m * ix + so1.q;
+                } else if (Math.abs(so1.m - so2.m) < 1e-10) {
+                    // Paralleli, usa punto medio
+                    ix = (allSegments[i].bx + allSegments[i + 1].ax) / 2;
+                    iy = so1.m * ix + so1.q;
+                } else {
+                    // Intersezione normale
+                    ix = (so2.q - so1.q) / (so1.m - so2.m);
+                    iy = so1.m * ix + so1.q;
+                }
+
+                intersections.push({ x: ix, y: iy });
+                console.log(`Intersezione so${i+1}∩so${i+2}: (${ix.toFixed(4)}, ${iy.toFixed(4)})`);
+            }
+
+            // Costruisci la polilinea offset tagliata
+            chartState.offsetPolyline = [];
+
+            // Primo punto: inizio del primo segmento originale, spostato
+            const firstSeg = allSegments[0];
+            const firstDx = firstSeg.bx - firstSeg.ax;
+            const firstDy = firstSeg.by - firstSeg.ay;
+            const firstLen = Math.sqrt(firstDx * firstDx + firstDy * firstDy);
+            const firstNx = -firstDy / firstLen;
+            const firstNy = firstDx / firstLen;
+            chartState.offsetPolyline.push({
+                x: firstSeg.ax + firstNx * offset,
+                y: firstSeg.ay + firstNy * offset
+            });
+
+            // Aggiungi tutte le intersezioni
+            intersections.forEach(io => {
+                chartState.offsetPolyline.push({ x: io.x, y: io.y });
+            });
+
+            // Ultimo punto: fine dell'ultimo segmento originale, spostato
+            const lastSeg = allSegments[allSegments.length - 1];
+            const lastDx = lastSeg.bx - lastSeg.ax;
+            const lastDy = lastSeg.by - lastSeg.ay;
+            const lastLen = Math.sqrt(lastDx * lastDx + lastDy * lastDy);
+            const lastNx = -lastDy / lastLen;
+            const lastNy = lastDx / lastLen;
+            chartState.offsetPolyline.push({
+                x: lastSeg.bx + lastNx * offset,
+                y: lastSeg.by + lastNy * offset
+            });
+
+            console.log('Polilinea offset:', chartState.offsetPolyline.length, 'punti');
+
             updateUI();
             drawChart();
         }
@@ -959,9 +1094,9 @@
                 ctx.stroke();
             }
 
-            // Disegna le rette offset (se presenti)
+            // Disegna le rette offset (se presenti) - linee sottili verdi
             if (chartState.offsetLines && chartState.offsetLines.length > 0) {
-                ctx.strokeStyle = '#00cc00';  // Verde per le rette offset
+                ctx.strokeStyle = '#88cc88';  // Verde chiaro per le rette infinite
                 ctx.lineWidth = 1;
 
                 chartState.offsetLines.forEach((line, idx) => {
@@ -970,8 +1105,23 @@
                     ctx.lineTo(transformX(line.x2), transformY(line.y2));
                     ctx.stroke();
                 });
+            }
 
-                console.log('Disegnate', chartState.offsetLines.length, 'rette offset');
+            // Disegna la polilinea offset tagliata (se presente) - linea spessa verde
+            if (chartState.offsetPolyline && chartState.offsetPolyline.length > 1) {
+                ctx.strokeStyle = '#00cc00';  // Verde per la polilinea offset finale
+                ctx.lineWidth = 3;
+
+                ctx.beginPath();
+                chartState.offsetPolyline.forEach((pt, idx) => {
+                    const sx = transformX(pt.x);
+                    const sy = transformY(pt.y);
+                    if (idx === 0) ctx.moveTo(sx, sy);
+                    else ctx.lineTo(sx, sy);
+                });
+                ctx.stroke();
+
+                console.log('Disegnata polilinea offset con', chartState.offsetPolyline.length, 'punti');
             }
 
             // Axis titles
