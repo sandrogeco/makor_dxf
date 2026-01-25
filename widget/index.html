@@ -410,6 +410,12 @@
                 <button class="control-btn full-width" onclick="applyOffset()" style="margin-top: 8px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));">
                     <span>Applica Offset</span>
                 </button>
+                <button class="control-btn full-width" onclick="initOffsetStep()" style="margin-top: 8px; background: #ff9900;">
+                    <span>Init Step</span>
+                </button>
+                <button class="control-btn full-width" onclick="nextOffsetStep()" style="margin-top: 8px; background: #ff5500;">
+                    <span>Step Avanti</span>
+                </button>
                 <button class="control-btn full-width" onclick="resetOffset()" style="margin-top: 8px;">
                     <span>Reset</span>
                 </button>
@@ -505,6 +511,9 @@
             segments: [],   // Array di segmenti separati [{points: [{x,y}...]}, ...]
             offsetLines: [], // Rette parallele calcolate da applyOffset [{x1,y1,x2,y2}, ...]
             offsetPolyline: [], // Polilinea offset tagliata alle intersezioni [{x,y}, ...]
+            offsetSurvivors: [], // Segmenti sopravvissuti per visualizzazione step-by-step
+            offsetNewSeg: null,  // Nuovo segmento che si sta inserendo (per visualizzazione)
+            autoScale: true,     // Autoscala per vedere tutti i segmenti
             offsetY: 0,
             line1X: 0,
             line2X: 100,
@@ -643,8 +652,282 @@
             chartState.offsetY = 0;
             chartState.offsetLines = [];
             chartState.offsetPolyline = [];
+            chartState.offsetSurvivors = [];
+            stepState = null;
             document.getElementById('offsetYInput').value = 0;
             updateUI();
+            drawChart();
+        }
+
+        // Stato per step-by-step
+        let stepState = null;
+
+        // Inizializza step-by-step
+        function initOffsetStep() {
+            const offset = parseFloat(document.getElementById('offsetYInput').value) || 0;
+            console.log('=== INIT STEP ===');
+            console.log('Offset:', offset);
+
+            // Raccogli segmenti
+            let allSegments = [];
+            if (chartState.segments && chartState.segments.length > 0) {
+                chartState.segments.forEach(seg => {
+                    for (let i = 0; i < seg.points.length - 1; i++) {
+                        allSegments.push({
+                            ax: seg.points[i].x,
+                            ay: seg.points[i].y,
+                            bx: seg.points[i + 1].x,
+                            by: seg.points[i + 1].y
+                        });
+                    }
+                });
+            } else if (chartState.data.length > 1) {
+                for (let i = 0; i < chartState.data.length - 1; i++) {
+                    allSegments.push({
+                        ax: chartState.data[i].x,
+                        ay: chartState.data[i].y,
+                        bx: chartState.data[i + 1].x,
+                        by: chartState.data[i + 1].y
+                    });
+                }
+            }
+
+            // Ordina per X
+            allSegments.sort((a, b) => Math.min(a.ax, a.bx) - Math.min(b.ax, b.bx));
+
+            // Range X per i segmenti
+            const allX = chartState.data.map(p => p.x);
+            const dataMinX = Math.min(...allX);
+            const dataMaxX = Math.max(...allX);
+            const xMin = dataMinX;   // Inizio da xmin dati
+            const xMax = dataMaxX;   // Fine a xmax dati
+
+            // Calcola offset per tutti i segmenti
+            // Ogni segmento parte da xMin e va verso xMax (infinito)
+            const offsetSegs = allSegments.map((seg, i) => {
+                const dx = seg.bx - seg.ax;
+                const dy = seg.by - seg.ay;
+
+                let m, q;
+                if (Math.abs(dx) < 1e-10) {
+                    m = Infinity;
+                    q = seg.ax + offset;
+                } else {
+                    m = dy / dx;
+                    q = seg.ay - m * seg.ax + offset * Math.sqrt(m * m + 1);
+                }
+
+                // Punti iniziale e finale: da xMin a xMax lungo la retta
+                let xi, yi, xf, yf;
+                if (m === Infinity) {
+                    // Retta verticale
+                    xi = q;
+                    yi = -1000;
+                    xf = q;
+                    yf = 1000;
+                } else {
+                    xi = xMin;
+                    yi = m * xMin + q;
+                    xf = xMax;
+                    yf = m * xMax + q;
+                }
+
+                return {
+                    m: m,
+                    q: q,
+                    xi: xi,
+                    yi: yi,
+                    xf: xf,
+                    yf: yf,
+                    origIdx: i
+                };
+            });
+
+            // Salva stato
+            stepState = {
+                offset: offset,
+                allSegments: allSegments,
+                offsetSegs: offsetSegs,
+                currentIdx: 0,
+                survivors: []
+            };
+
+            // Disegna le rette offset (linee sottili) - usa stessi punti dei segmenti
+            chartState.offsetLines = offsetSegs.map(seg => ({
+                x1: seg.xi,
+                y1: seg.yi,
+                x2: seg.xf,
+                y2: seg.yf
+            }));
+
+            chartState.offsetSurvivors = [];
+            chartState.offsetPolyline = [];
+
+            console.log('Segmenti offset:', offsetSegs.length);
+            console.log('Premi "Step Avanti" per iniziare');
+
+            drawChart();
+        }
+
+        // Avanza di uno step
+        function nextOffsetStep() {
+            if (!stepState) {
+                console.log('Prima premi "Init Step"');
+                return;
+            }
+
+            const { offsetSegs, survivors } = stepState;
+            const i = stepState.currentIdx;
+
+            if (i >= offsetSegs.length) {
+                console.log('Completato!');
+                return;
+            }
+
+            const newSeg = offsetSegs[i];
+            console.log(`\n=== STEP ${i} ===`);
+            console.log(`Inserisco so_${i}: (${newSeg.xi.toFixed(4)}, ${newSeg.yi.toFixed(4)}) -> (${newSeg.xf.toFixed(4)}, ${newSeg.yf.toFixed(4)})`);
+            console.log(`  m=${newSeg.m.toFixed(4)}, q=${newSeg.q.toFixed(4)}`);
+
+            // Salva nuovo segmento per visualizzazione (in arancione)
+            chartState.offsetNewSeg = {
+                xi: newSeg.xi, yi: newSeg.yi,
+                xf: newSeg.xf, yf: newSeg.yf,
+                m: newSeg.m, q: newSeg.q
+            };
+
+            // Funzione intersezione - verifica che cada dentro i limiti del segmento
+            function intersect(s1, s2) {
+                let ix, iy;
+
+                if (s1.m === Infinity && s2.m === Infinity) {
+                    // Entrambe verticali
+                    if (Math.abs(s1.q - s2.q) < 1e-9) {
+                        // Stessa retta verticale - punto in comune
+                        ix = s1.q;
+                        iy = Math.max(Math.min(s1.yi, s1.yf), Math.min(s2.yi, s2.yf));
+                        return { x: ix, y: iy };
+                    }
+                    return null; // Verticali parallele diverse
+                }
+                if (s1.m === Infinity) {
+                    ix = s1.q;
+                    iy = s2.m * ix + s2.q;
+                } else if (s2.m === Infinity) {
+                    ix = s2.q;
+                    iy = s1.m * ix + s1.q;
+                } else if (Math.abs(s1.m - s2.m) < 1e-10) {
+                    // Parallele - controlla se stessa retta
+                    if (Math.abs(s1.q - s2.q) < 1e-9) {
+                        // Stessa retta - trova punto in comune
+                        // Intersezione degli intervalli X
+                        const s1minX = Math.min(s1.xi, s1.xf);
+                        const s1maxX = Math.max(s1.xi, s1.xf);
+                        const s2minX = Math.min(s2.xi, s2.xf);
+                        const s2maxX = Math.max(s2.xi, s2.xf);
+
+                        const overlapMin = Math.max(s1minX, s2minX);
+                        const overlapMax = Math.min(s1maxX, s2maxX);
+
+                        if (overlapMin <= overlapMax) {
+                            ix = overlapMin;
+                            iy = s1.m * ix + s1.q;
+                            return { x: ix, y: iy };
+                        }
+                    }
+                    return null; // Parallele diverse o senza sovrapposizione
+                } else {
+                    ix = (s2.q - s1.q) / (s1.m - s2.m);
+                    iy = s1.m * ix + s1.q;
+                }
+
+                // Verifica che l'intersezione sia dentro i limiti di ENTRAMBI i segmenti
+                const inS1 = ix >= Math.min(s1.xi, s1.xf) - 1e-9 && ix <= Math.max(s1.xi, s1.xf) + 1e-9 &&
+                             iy >= Math.min(s1.yi, s1.yf) - 1e-9 && iy <= Math.max(s1.yi, s1.yf) + 1e-9;
+                const inS2 = ix >= Math.min(s2.xi, s2.xf) - 1e-9 && ix <= Math.max(s2.xi, s2.xf) + 1e-9 &&
+                             iy >= Math.min(s2.yi, s2.yf) - 1e-9 && iy <= Math.max(s2.yi, s2.yf) + 1e-9;
+
+                if (!inS1 || !inS2) {
+                    return null; // Intersezione fuori dai segmenti
+                }
+
+                return { x: ix, y: iy };
+            }
+
+            if (i === 0) {
+                // Primo segmento
+                survivors.push({
+                    xi: newSeg.xi, yi: newSeg.yi,
+                    xf: newSeg.xf, yf: newSeg.yf,
+                    m: newSeg.m, q: newSeg.q
+                });
+                console.log('  Primo segmento inserito');
+            } else {
+                // Cerca indietro
+                let k = survivors.length - 1;
+                let lastIntersection = null;
+
+                while (k >= 0) {
+                    const prevSeg = survivors[k];
+                    const inter = intersect(newSeg, prevSeg);
+
+                    if (inter) {
+                        console.log(`  so_${i} ∩ survivors[${k}] = (${inter.x.toFixed(4)}, ${inter.y.toFixed(4)})`);
+                        lastIntersection = inter;
+                        k--;
+                    } else {
+                        console.log(`  so_${i} ∩ survivors[${k}] = NESSUNA`);
+                        break;
+                    }
+                }
+
+                const firstIntersecting = k + 1;
+
+                if (lastIntersection && firstIntersecting < survivors.length) {
+                    const removed = survivors.length - firstIntersecting - 1;
+                    if (removed > 0) {
+                        console.log(`  Rimuovo ${removed} segmenti`);
+                        survivors.splice(firstIntersecting + 1);
+                    }
+
+                    survivors[firstIntersecting].xf = lastIntersection.x;
+                    survivors[firstIntersecting].yf = lastIntersection.y;
+                    console.log(`  Modifico survivors[${firstIntersecting}].end`);
+
+                    survivors.push({
+                        xi: lastIntersection.x, yi: lastIntersection.y,
+                        xf: newSeg.xf, yf: newSeg.yf,
+                        m: newSeg.m, q: newSeg.q
+                    });
+                } else {
+                    const prevEnd = survivors[survivors.length - 1];
+                    survivors.push({
+                        xi: prevEnd.xf, yi: prevEnd.yf,
+                        xf: newSeg.xf, yf: newSeg.yf,
+                        m: newSeg.m, q: newSeg.q
+                    });
+                    console.log('  Collegamento normale');
+                }
+            }
+
+            console.log(`Survivors: ${survivors.length}`);
+            survivors.forEach((s, idx) => {
+                console.log(`  [${idx}]: (${s.xi.toFixed(4)}, ${s.yi.toFixed(4)}) -> (${s.xf.toFixed(4)}, ${s.yf.toFixed(4)})`);
+            });
+
+            // Aggiorna visualizzazione
+            chartState.offsetSurvivors = [...survivors];
+
+            // Costruisci polilinea
+            chartState.offsetPolyline = [];
+            survivors.forEach((s, idx) => {
+                if (idx === 0) {
+                    chartState.offsetPolyline.push({ x: s.xi, y: s.yi });
+                }
+                chartState.offsetPolyline.push({ x: s.xf, y: s.yf });
+            });
+
+            stepState.currentIdx++;
             drawChart();
         }
 
@@ -755,11 +1038,9 @@
 
             console.log('Rette offset create:', chartState.offsetLines.length);
 
-            // INTERSEZIONI: taglia i segmenti offset alle intersezioni
-            // so1, so2, so3... → intersezione so1∩so2 = io21, so2∩so3 = io32, ...
-            // so1 diventa (so1_start → io21)
-            // so2 diventa (io21 → io32)
-            // ecc.
+            // INTERSEZIONI con backtracking:
+            // Per ogni so_i, cerca intersezione andando indietro fino a so_k che non interseca
+            // Rimuovi segmenti intermedi, modifica endpoint di so_k+1
 
             if (chartState.offsetLines.length < 2) {
                 updateUI();
@@ -767,103 +1048,144 @@
                 return;
             }
 
-            const trimmedSegments = [];
-
-            for (let i = 0; i < chartState.offsetLines.length; i++) {
-                const so = chartState.offsetLines[i];
-
-                // Calcola m e q per questo segmento offset
-                // (già calcolati prima, ma li ricalcolo per coerenza)
-                const seg = allSegments[i];
+            // Calcola m e q per tutti i segmenti offset
+            const offsetSegs = allSegments.map((seg, i) => {
                 const dx = seg.bx - seg.ax;
                 const dy = seg.by - seg.ay;
+                const len = Math.sqrt(dx * dx + dy * dy);
 
                 let m, q;
                 if (Math.abs(dx) < 1e-10) {
-                    // Segmento verticale
                     m = Infinity;
-                    q = seg.ax + offset; // x = costante
+                    q = seg.ax + offset;
                 } else {
                     m = dy / dx;
                     q = seg.ay - m * seg.ax + offset * Math.sqrt(m * m + 1);
                 }
 
-                trimmedSegments.push({
+                // Calcola punti iniziale e finale del segmento offset
+                const nx = -dy / len;
+                const ny = dx / len;
+
+                return {
                     m: m,
                     q: q,
-                    // Punti iniziali e finali (verranno aggiornati con le intersezioni)
-                    xi: so.x1,
-                    yi: so.y1,
-                    xf: so.x2,
-                    yf: so.y2
-                });
+                    xi: seg.ax + nx * offset,
+                    yi: seg.ay + ny * offset,
+                    xf: seg.bx + nx * offset,
+                    yf: seg.by + ny * offset
+                };
+            });
+
+            // Funzione per calcolare intersezione tra due rette
+            function intersect(s1, s2) {
+                if (s1.m === Infinity && s2.m === Infinity) return null;
+                if (s1.m === Infinity) {
+                    return { x: s1.q, y: s2.m * s1.q + s2.q };
+                }
+                if (s2.m === Infinity) {
+                    return { x: s2.q, y: s1.m * s2.q + s1.q };
+                }
+                if (Math.abs(s1.m - s2.m) < 1e-10) return null; // Parallele
+                const x = (s2.q - s1.q) / (s1.m - s2.m);
+                const y = s1.m * x + s1.q;
+                return { x, y };
             }
 
-            // Calcola intersezioni tra segmenti adiacenti
-            const intersections = []; // io21, io32, io43, ...
+            // Lista dei segmenti sopravvissuti: [{xi, yi, xf, yf}, ...]
+            const survivors = [];
 
-            for (let i = 0; i < trimmedSegments.length - 1; i++) {
-                const so1 = trimmedSegments[i];
-                const so2 = trimmedSegments[i + 1];
+            // Inserisci primo segmento
+            survivors.push({
+                xi: offsetSegs[0].xi,
+                yi: offsetSegs[0].yi,
+                xf: offsetSegs[0].xf,
+                yf: offsetSegs[0].yf,
+                m: offsetSegs[0].m,
+                q: offsetSegs[0].q
+            });
 
-                let ix, iy;
+            console.log('=== ALGORITMO INTERSEZIONI ===');
+            console.log('Inserisco so_0:', survivors[0]);
 
-                if (so1.m === Infinity && so2.m === Infinity) {
-                    // Entrambi verticali, nessuna intersezione
-                    ix = so1.q;
-                    iy = 0;
-                } else if (so1.m === Infinity) {
-                    // so1 verticale: x = so1.q
-                    ix = so1.q;
-                    iy = so2.m * ix + so2.q;
-                } else if (so2.m === Infinity) {
-                    // so2 verticale: x = so2.q
-                    ix = so2.q;
-                    iy = so1.m * ix + so1.q;
-                } else if (Math.abs(so1.m - so2.m) < 1e-10) {
-                    // Paralleli, usa punto medio
-                    ix = (allSegments[i].bx + allSegments[i + 1].ax) / 2;
-                    iy = so1.m * ix + so1.q;
-                } else {
-                    // Intersezione normale
-                    ix = (so2.q - so1.q) / (so1.m - so2.m);
-                    iy = so1.m * ix + so1.q;
+            // Inserisci gli altri segmenti uno alla volta
+            for (let i = 1; i < offsetSegs.length; i++) {
+                const newSeg = offsetSegs[i];
+                console.log(`\nInserisco so_${i}: m=${newSeg.m.toFixed(4)}, q=${newSeg.q.toFixed(4)}`);
+
+                // Cerca indietro finché trovi intersezione
+                let k = survivors.length - 1;
+                let lastIntersection = null;
+
+                while (k >= 0) {
+                    const prevSeg = survivors[k];
+                    const inter = intersect(newSeg, prevSeg);
+
+                    if (inter) {
+                        console.log(`  so_${i} ∩ survivors[${k}] = (${inter.x.toFixed(4)}, ${inter.y.toFixed(4)})`);
+                        lastIntersection = inter;
+                        k--;
+                    } else {
+                        console.log(`  so_${i} ∩ survivors[${k}] = NESSUNA`);
+                        break;
+                    }
                 }
 
-                intersections.push({ x: ix, y: iy });
-                console.log(`Intersezione so${i+1}∩so${i+2}: (${ix.toFixed(4)}, ${iy.toFixed(4)})`);
+                // k+1 è l'indice del primo segmento che interseca
+                const firstIntersecting = k + 1;
+
+                if (lastIntersection && firstIntersecting < survivors.length) {
+                    // Rimuovi segmenti da firstIntersecting+1 in poi
+                    const removed = survivors.length - firstIntersecting - 1;
+                    if (removed > 0) {
+                        console.log(`  Rimuovo ${removed} segmenti (da ${firstIntersecting + 1} a ${survivors.length - 1})`);
+                        survivors.splice(firstIntersecting + 1);
+                    }
+
+                    // Modifica endpoint del segmento firstIntersecting
+                    survivors[firstIntersecting].xf = lastIntersection.x;
+                    survivors[firstIntersecting].yf = lastIntersection.y;
+                    console.log(`  survivors[${firstIntersecting}].end = (${lastIntersection.x.toFixed(4)}, ${lastIntersection.y.toFixed(4)})`);
+
+                    // Aggiungi nuovo segmento che parte dall'intersezione
+                    survivors.push({
+                        xi: lastIntersection.x,
+                        yi: lastIntersection.y,
+                        xf: newSeg.xf,
+                        yf: newSeg.yf,
+                        m: newSeg.m,
+                        q: newSeg.q
+                    });
+                    console.log(`  Nuovo segmento: (${lastIntersection.x.toFixed(4)}, ${lastIntersection.y.toFixed(4)}) -> (${newSeg.xf.toFixed(4)}, ${newSeg.yf.toFixed(4)})`);
+                } else {
+                    // Nessuna intersezione trovata, collega normalmente
+                    const prevEnd = survivors[survivors.length - 1];
+                    survivors.push({
+                        xi: prevEnd.xf,
+                        yi: prevEnd.yf,
+                        xf: newSeg.xf,
+                        yf: newSeg.yf,
+                        m: newSeg.m,
+                        q: newSeg.q
+                    });
+                    console.log(`  Collegamento normale da (${prevEnd.xf.toFixed(4)}, ${prevEnd.yf.toFixed(4)})`);
+                }
+
+                console.log(`  Survivors totali: ${survivors.length}`);
             }
 
-            // Costruisci la polilinea offset tagliata
+            console.log('\n=== SEGMENTI SOPRAVVISSUTI ===');
+            survivors.forEach((s, i) => {
+                console.log(`  ${i}: (${s.xi.toFixed(4)}, ${s.yi.toFixed(4)}) -> (${s.xf.toFixed(4)}, ${s.yf.toFixed(4)})`);
+            });
+
+            // Costruisci polilinea dai sopravvissuti
             chartState.offsetPolyline = [];
-
-            // Primo punto: inizio del primo segmento originale, spostato
-            const firstSeg = allSegments[0];
-            const firstDx = firstSeg.bx - firstSeg.ax;
-            const firstDy = firstSeg.by - firstSeg.ay;
-            const firstLen = Math.sqrt(firstDx * firstDx + firstDy * firstDy);
-            const firstNx = -firstDy / firstLen;
-            const firstNy = firstDx / firstLen;
-            chartState.offsetPolyline.push({
-                x: firstSeg.ax + firstNx * offset,
-                y: firstSeg.ay + firstNy * offset
-            });
-
-            // Aggiungi tutte le intersezioni
-            intersections.forEach(io => {
-                chartState.offsetPolyline.push({ x: io.x, y: io.y });
-            });
-
-            // Ultimo punto: fine dell'ultimo segmento originale, spostato
-            const lastSeg = allSegments[allSegments.length - 1];
-            const lastDx = lastSeg.bx - lastSeg.ax;
-            const lastDy = lastSeg.by - lastSeg.ay;
-            const lastLen = Math.sqrt(lastDx * lastDx + lastDy * lastDy);
-            const lastNx = -lastDy / lastLen;
-            const lastNy = lastDx / lastLen;
-            chartState.offsetPolyline.push({
-                x: lastSeg.bx + lastNx * offset,
-                y: lastSeg.by + lastNy * offset
+            survivors.forEach((s, i) => {
+                if (i === 0) {
+                    chartState.offsetPolyline.push({ x: s.xi, y: s.yi });
+                }
+                chartState.offsetPolyline.push({ x: s.xf, y: s.yf });
             });
 
             console.log('Polilinea offset:', chartState.offsetPolyline.length, 'punti');
@@ -970,6 +1292,27 @@
             let dataMaxX = Math.max(...chartState.data.map(p => p.x));
             let dataMinY = Math.min(...chartState.data.map(p => p.y));
             let dataMaxY = Math.max(...chartState.data.map(p => p.y));
+
+            // AUTOSCALE: includi anche segmenti offset
+            if (chartState.autoScale) {
+                // Includi survivors
+                if (chartState.offsetSurvivors && chartState.offsetSurvivors.length > 0) {
+                    chartState.offsetSurvivors.forEach(seg => {
+                        dataMinX = Math.min(dataMinX, seg.xi, seg.xf);
+                        dataMaxX = Math.max(dataMaxX, seg.xi, seg.xf);
+                        dataMinY = Math.min(dataMinY, seg.yi, seg.yf);
+                        dataMaxY = Math.max(dataMaxY, seg.yi, seg.yf);
+                    });
+                }
+                // Includi nuovo segmento
+                if (chartState.offsetNewSeg) {
+                    const ns = chartState.offsetNewSeg;
+                    dataMinX = Math.min(dataMinX, ns.xi, ns.xf);
+                    dataMaxX = Math.max(dataMaxX, ns.xi, ns.xf);
+                    dataMinY = Math.min(dataMinY, ns.yi, ns.yf);
+                    dataMaxY = Math.max(dataMaxY, ns.yi, ns.yf);
+                }
+            }
 
             // Applica range selector X (in percentuale 0-100)
             const fullRangeX = dataMaxX - dataMinX;
@@ -1107,9 +1450,70 @@
                 });
             }
 
-            // Disegna la polilinea offset tagliata (se presente) - linea spessa verde
-            if (chartState.offsetPolyline && chartState.offsetPolyline.length > 1) {
-                ctx.strokeStyle = '#00cc00';  // Verde per la polilinea offset finale
+            // Disegna il nuovo segmento che si sta inserendo (ARANCIONE)
+            if (chartState.offsetNewSeg) {
+                const ns = chartState.offsetNewSeg;
+                ctx.strokeStyle = '#ff9900';
+                ctx.lineWidth = 4;
+                ctx.setLineDash([10, 5]);
+                ctx.beginPath();
+                ctx.moveTo(transformX(ns.xi), transformY(ns.yi));
+                ctx.lineTo(transformX(ns.xf), transformY(ns.yf));
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Punti inizio/fine arancioni
+                ctx.fillStyle = '#ff9900';
+                ctx.beginPath();
+                ctx.arc(transformX(ns.xi), transformY(ns.yi), 8, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(transformX(ns.xf), transformY(ns.yf), 8, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // Label "NEW"
+                ctx.fillStyle = '#ff9900';
+                ctx.font = 'bold 12px Arial';
+                ctx.fillText('NEW', transformX(ns.xi) + 10, transformY(ns.yi) - 10);
+            }
+
+            // Disegna i segmenti sopravvissuti con punti colorati
+            if (chartState.offsetSurvivors && chartState.offsetSurvivors.length > 0) {
+                // Disegna segmenti
+                ctx.strokeStyle = '#00cc00';
+                ctx.lineWidth = 3;
+
+                chartState.offsetSurvivors.forEach((seg, idx) => {
+                    ctx.beginPath();
+                    ctx.moveTo(transformX(seg.xi), transformY(seg.yi));
+                    ctx.lineTo(transformX(seg.xf), transformY(seg.yf));
+                    ctx.stroke();
+                });
+
+                // Disegna punti inizio (blu) e fine (rosso)
+                chartState.offsetSurvivors.forEach((seg, idx) => {
+                    // Punto inizio - BLU
+                    ctx.fillStyle = '#0000ff';
+                    ctx.beginPath();
+                    ctx.arc(transformX(seg.xi), transformY(seg.yi), 6, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    // Punto fine - ROSSO
+                    ctx.fillStyle = '#ff0000';
+                    ctx.beginPath();
+                    ctx.arc(transformX(seg.xf), transformY(seg.yf), 6, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    // Numero segmento
+                    ctx.fillStyle = '#000';
+                    ctx.font = '10px Arial';
+                    ctx.fillText(idx.toString(), transformX(seg.xi) + 8, transformY(seg.yi) - 8);
+                });
+
+                console.log('Disegnati', chartState.offsetSurvivors.length, 'segmenti sopravvissuti');
+            } else if (chartState.offsetPolyline && chartState.offsetPolyline.length > 1) {
+                // Fallback: disegna polilinea se non ci sono survivors
+                ctx.strokeStyle = '#00cc00';
                 ctx.lineWidth = 3;
 
                 ctx.beginPath();
@@ -1120,8 +1524,6 @@
                     else ctx.lineTo(sx, sy);
                 });
                 ctx.stroke();
-
-                console.log('Disegnata polilinea offset con', chartState.offsetPolyline.length, 'punti');
             }
 
             // Axis titles
