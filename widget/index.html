@@ -623,30 +623,40 @@
             chartState.data.sort((a, b) => a.x - b.x);
 
             console.log('CSV parsato: ' + chartState.data.length + ' punti (ordinati per X)');
-            document.getElementById('connectionStatus').textContent = 'CSV caricato (' + chartState.data.length + ' punti)';
 
             // Inizializza limiti assi e linee al caricamento
             if (chartState.data.length > 0) {
+                // Calcola min per traslazione
                 const xValues = chartState.data.map(p => p.x);
                 const yValues = chartState.data.map(p => p.y);
                 const dataMinX = Math.min(...xValues);
-                const dataMaxX = Math.max(...xValues);
                 const dataMinY = Math.min(...yValues);
-                const dataMaxY = Math.max(...yValues);
 
-                // Limiti assi: max = max(xmax, ymax)
+                // Trasla tutti i punti: x = x - xmin, y = y - ymin
+                chartState.data = chartState.data.map(p => ({
+                    x: p.x - dataMinX,
+                    y: p.y - dataMinY
+                }));
+
+                // Ricalcola max dopo traslazione
+                const dataMaxX = Math.max(...chartState.data.map(p => p.x));
+                const dataMaxY = Math.max(...chartState.data.map(p => p.y));
+
+                // Limiti assi: min = 0, max = max(xmax, ymax)
                 const axisMax = Math.max(dataMaxX, dataMaxY);
-                chartState.axisMinX = dataMinX;
+                chartState.axisMinX = 0;
                 chartState.axisMaxX = axisMax;
-                chartState.axisMinY = dataMinY;
+                chartState.axisMinY = 0;
                 chartState.axisMaxY = axisMax;
 
                 // Linee verticali ai limiti dati
-                chartState.line1X = dataMinX;
+                chartState.line1X = 0;
                 chartState.line2X = dataMaxX;
-                document.getElementById('line1Input').value = dataMinX.toFixed(3);
+                document.getElementById('line1Input').value = '0';
                 document.getElementById('line2Input').value = dataMaxX.toFixed(3);
             }
+
+            document.getElementById('connectionStatus').textContent = 'CSV caricato (' + chartState.data.length + ' punti)';
 
             updateUI();
             drawChart();
@@ -1821,14 +1831,17 @@
                 console.log('X:', Math.min(...xPoints).toFixed(2), 'to', Math.max(...xPoints).toFixed(2));
                 console.log('Y:', Math.min(...yPoints).toFixed(2), 'to', Math.max(...yPoints).toFixed(2));
 
-                // Normalizza Y: sottrai min(y) da tutti i punti
+                // Trasla tutti i punti: x = x - xmin, y = y - ymin
+                const minXValue = Math.min(...xPoints);
                 const minYValue = Math.min(...yPoints);
-                for (let i = 0; i < yPoints.length; i++) {
+                for (let i = 0; i < xPoints.length; i++) {
+                    xPoints[i] -= minXValue;
                     yPoints[i] -= minYValue;
                 }
 
-                console.log('Normalizzazione Y completata. min(y) sottratto:', minYValue.toFixed(2));
-                console.log('Y dopo normalizzazione:', Math.min(...yPoints).toFixed(2), 'to', Math.max(...yPoints).toFixed(2));
+                console.log('Traslazione completata. Sottratti minX:', minXValue.toFixed(2), 'minY:', minYValue.toFixed(2));
+                console.log('X dopo traslazione:', Math.min(...xPoints).toFixed(2), 'to', Math.max(...xPoints).toFixed(2));
+                console.log('Y dopo traslazione:', Math.min(...yPoints).toFixed(2), 'to', Math.max(...yPoints).toFixed(2));
 
                 // Converti in formato chartState.data
                 chartState.data = [];
@@ -1836,33 +1849,31 @@
                     chartState.data.push({ x: xPoints[i], y: yPoints[i] });
                 }
 
-                // Salva i segmenti separati (normalizzati con lo stesso minYValue)
+                // Salva i segmenti separati (traslati)
                 chartState.segments = segments.map(seg => ({
                     type: seg.type,
-                    points: seg.points.map(p => ({ x: p.x, y: p.y - minYValue }))
+                    points: seg.points.map(p => ({ x: p.x - minXValue, y: p.y - minYValue }))
                 }));
 
                 console.log('chartState.data popolato con', chartState.data.length, 'punti');
                 console.log('chartState.segments:', chartState.segments.length, 'segmenti separati');
                 console.log('Primi 3 punti:', chartState.data.slice(0, 3));
 
-                // Calcola statistiche
-                const minX = Math.min(...xPoints);
+                // Calcola statistiche dopo traslazione
                 const maxX = Math.max(...xPoints);
-                const minY = Math.min(...yPoints);
                 const maxY = Math.max(...yPoints);
 
-                // Limiti assi: max = max(xmax, ymax)
+                // Limiti assi: min = 0, max = max(xmax, ymax)
                 const axisMax = Math.max(maxX, maxY);
-                chartState.axisMinX = minX;
+                chartState.axisMinX = 0;
                 chartState.axisMaxX = axisMax;
-                chartState.axisMinY = minY;
+                chartState.axisMinY = 0;
                 chartState.axisMaxY = axisMax;
 
                 // Inizializza linee verticali ai limiti dati
-                chartState.line1X = minX;
+                chartState.line1X = 0;
                 chartState.line2X = maxX;
-                document.getElementById('line1Input').value = minX.toFixed(3);
+                document.getElementById('line1Input').value = '0';
                 document.getElementById('line2Input').value = maxX.toFixed(3);
 
                 let successMsg = `Caricati ${xPoints.length} punti`;
@@ -1878,8 +1889,8 @@
 
                 console.log('=== DXF CARICATO CON SUCCESSO ===');
                 console.log(successMsg);
-                console.log('Range X:', minX.toFixed(1), 'to', maxX.toFixed(1));
-                console.log('Range Y:', minY.toFixed(1), 'to', maxY.toFixed(1));
+                console.log('Range X: 0 to', maxX.toFixed(1));
+                console.log('Range Y: 0 to', maxY.toFixed(1));
 
                 // Esporta CSV (opzionale)
                 exportToCSV(chartState.data);
