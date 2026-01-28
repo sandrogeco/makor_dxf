@@ -410,12 +410,14 @@
                 <button class="control-btn full-width" onclick="applyOffset()" style="margin-top: 8px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));">
                     <span>Applica Offset</span>
                 </button>
-                <button class="control-btn full-width" onclick="initOffsetStep()" style="margin-top: 8px; background: #ff9900;">
-                    <span>Init Step</span>
-                </button>
-                <button class="control-btn full-width" onclick="nextOffsetStep()" style="margin-top: 8px; background: #ff5500;">
-                    <span>Step Avanti</span>
-                </button>
+                <div id="debugButtons" style="display: none;">
+                    <button class="control-btn full-width" onclick="initOffsetStep()" style="margin-top: 8px; background: #ff9900;">
+                        <span>Init Step</span>
+                    </button>
+                    <button class="control-btn full-width" onclick="nextOffsetStep()" style="margin-top: 8px; background: #ff5500;">
+                        <span>Step Avanti</span>
+                    </button>
+                </div>
                 <button class="control-btn full-width" onclick="resetOffset()" style="margin-top: 8px;">
                     <span>Reset</span>
                 </button>
@@ -506,6 +508,9 @@
     </div>
 
     <script>
+        // Debug mode da URL: ?debug=true
+        const DEBUG_MODE = new URLSearchParams(window.location.search).get('debug') === 'true';
+
         let chartState = {
             data: [],
             segments: [],   // Array di segmenti separati [{points: [{x,y}...]}, ...]
@@ -513,7 +518,7 @@
             offsetPolyline: [], // Polilinea offset tagliata alle intersezioni [{x,y}, ...]
             offsetSurvivors: [], // Segmenti sopravvissuti per visualizzazione step-by-step
             offsetNewSeg: null,  // Nuovo segmento che si sta inserendo (per visualizzazione)
-            autoScale: true,     // Autoscala per vedere tutti i segmenti
+            autoScale: false,    // Autoscala disabilitata
             offsetY: 0,
             line1X: 0,
             line2X: 100,
@@ -1056,19 +1061,31 @@
                 };
             });
 
-            // Funzione per calcolare intersezione tra due rette
+            // Funzione per calcolare intersezione tra due RETTE (no bounds checking)
             function intersect(s1, s2) {
-                if (s1.m === Infinity && s2.m === Infinity) return null;
+                let ix, iy;
+                if (s1.m === Infinity && s2.m === Infinity) {
+                    if (Math.abs(s1.q - s2.q) < 1e-9) {
+                        return { x: s1.q, y: 0, sameLineVertical: true };
+                    }
+                    return null;
+                }
                 if (s1.m === Infinity) {
-                    return { x: s1.q, y: s2.m * s1.q + s2.q };
+                    ix = s1.q;
+                    iy = s2.m * ix + s2.q;
+                } else if (s2.m === Infinity) {
+                    ix = s2.q;
+                    iy = s1.m * ix + s1.q;
+                } else if (Math.abs(s1.m - s2.m) < 1e-10) {
+                    if (Math.abs(s1.q - s2.q) < 1e-9) {
+                        return { x: s1.xi, y: s1.yi, sameLine: true };
+                    }
+                    return null;
+                } else {
+                    ix = (s2.q - s1.q) / (s1.m - s2.m);
+                    iy = s1.m * ix + s1.q;
                 }
-                if (s2.m === Infinity) {
-                    return { x: s2.q, y: s1.m * s2.q + s1.q };
-                }
-                if (Math.abs(s1.m - s2.m) < 1e-10) return null; // Parallele
-                const x = (s2.q - s1.q) / (s1.m - s2.m);
-                const y = s1.m * x + s1.q;
-                return { x, y };
+                return { x: ix, y: iy };
             }
 
             // Lista dei segmenti sopravvissuti: [{xi, yi, xf, yf}, ...]
@@ -1092,39 +1109,45 @@
                 const newSeg = offsetSegs[i];
                 console.log(`\nInserisco so_${i}: m=${newSeg.m.toFixed(4)}, q=${newSeg.q.toFixed(4)}`);
 
-                // Cerca indietro finché trovi intersezione
+                // Cerca indietro: STOP alla PRIMA intersezione valida
                 let k = survivors.length - 1;
                 let lastIntersection = null;
 
-                while (k >= 0) {
+                while (k >= 0 && !lastIntersection) {
                     const prevSeg = survivors[k];
                     const inter = intersect(newSeg, prevSeg);
 
                     if (inter) {
-                        console.log(`  so_${i} ∩ survivors[${k}] = (${inter.x.toFixed(4)}, ${inter.y.toFixed(4)})`);
-                        lastIntersection = inter;
-                        k--;
+                        // Intersezione valida solo se x >= punto iniziale del survivor
+                        if (inter.x >= prevSeg.xi - 1e-9) {
+                            console.log(`  so_${i} ∩ survivors[${k}] = (${inter.x.toFixed(4)}, ${inter.y.toFixed(4)}) VALIDA - STOP`);
+                            lastIntersection = inter;
+                            lastIntersection.survivorIdx = k;
+                            // STOP - non continuare a cercare
+                        } else {
+                            console.log(`  so_${i} ∩ survivors[${k}] = (${inter.x.toFixed(4)}, ${inter.y.toFixed(4)}) FUORI (x < xi)`);
+                            k--;
+                        }
                     } else {
-                        console.log(`  so_${i} ∩ survivors[${k}] = NESSUNA`);
-                        break;
+                        console.log(`  so_${i} ∩ survivors[${k}] = PARALLELE`);
+                        k--;
                     }
                 }
 
-                // k+1 è l'indice del primo segmento che interseca
-                const firstIntersecting = k + 1;
+                if (lastIntersection) {
+                    const survivorIdx = lastIntersection.survivorIdx;
 
-                if (lastIntersection && firstIntersecting < survivors.length) {
-                    // Rimuovi segmenti da firstIntersecting+1 in poi
-                    const removed = survivors.length - firstIntersecting - 1;
+                    // Rimuovi segmenti dopo survivorIdx
+                    const removed = survivors.length - survivorIdx - 1;
                     if (removed > 0) {
-                        console.log(`  Rimuovo ${removed} segmenti (da ${firstIntersecting + 1} a ${survivors.length - 1})`);
-                        survivors.splice(firstIntersecting + 1);
+                        console.log(`  Rimuovo ${removed} segmenti (da ${survivorIdx + 1} a ${survivors.length - 1})`);
+                        survivors.splice(survivorIdx + 1);
                     }
 
-                    // Modifica endpoint del segmento firstIntersecting
-                    survivors[firstIntersecting].xf = lastIntersection.x;
-                    survivors[firstIntersecting].yf = lastIntersection.y;
-                    console.log(`  survivors[${firstIntersecting}].end = (${lastIntersection.x.toFixed(4)}, ${lastIntersection.y.toFixed(4)})`);
+                    // Modifica endpoint del segmento survivorIdx
+                    survivors[survivorIdx].xf = lastIntersection.x;
+                    survivors[survivorIdx].yf = lastIntersection.y;
+                    console.log(`  survivors[${survivorIdx}].end = (${lastIntersection.x.toFixed(4)}, ${lastIntersection.y.toFixed(4)})`);
 
                     // Aggiungi nuovo segmento che parte dall'intersezione
                     survivors.push({
@@ -1136,19 +1159,8 @@
                         q: newSeg.q
                     });
                     console.log(`  Nuovo segmento: (${lastIntersection.x.toFixed(4)}, ${lastIntersection.y.toFixed(4)}) -> (${newSeg.xf.toFixed(4)}, ${newSeg.yf.toFixed(4)})`);
-                } else {
-                    // Nessuna intersezione trovata, collega normalmente
-                    const prevEnd = survivors[survivors.length - 1];
-                    survivors.push({
-                        xi: prevEnd.xf,
-                        yi: prevEnd.yf,
-                        xf: newSeg.xf,
-                        yf: newSeg.yf,
-                        m: newSeg.m,
-                        q: newSeg.q
-                    });
-                    console.log(`  Collegamento normale da (${prevEnd.xf.toFixed(4)}, ${prevEnd.yf.toFixed(4)})`);
                 }
+                // Se nessuna intersezione valida, non aggiungiamo nulla (no "collegamento normale")
 
                 console.log(`  Survivors totali: ${survivors.length}`);
             }
@@ -1209,8 +1221,6 @@
             document.getElementById('currentOffsetY').textContent = chartState.offsetY.toFixed(0);
             document.getElementById('interpolationValue').textContent = INTERPOLATION_STEP.toFixed(3);
             document.getElementById('currentInterpolation').textContent = INTERPOLATION_STEP.toFixed(3);
-            document.getElementById('line1Value').textContent = chartState.line1X.toFixed(0);
-            document.getElementById('line2Value').textContent = chartState.line2X.toFixed(0);
 
             // Calcola range se ci sono dati
             if (chartState.data.length > 0) {
@@ -1227,9 +1237,15 @@
                 const decimalsX = getDecimalPlaces(rangeX);
                 const decimalsY = getDecimalPlaces(rangeY);
 
+                // Limiti con decimali appropriati
+                document.getElementById('line1Value').textContent = chartState.line1X.toFixed(decimalsX);
+                document.getElementById('line2Value').textContent = chartState.line2X.toFixed(decimalsX);
+
                 document.getElementById('rangeX').textContent = minX.toFixed(decimalsX) + ' ~ ' + maxX.toFixed(decimalsX);
                 document.getElementById('rangeY').textContent = minY.toFixed(decimalsY) + ' ~ ' + maxY.toFixed(decimalsY);
             } else {
+                document.getElementById('line1Value').textContent = chartState.line1X.toFixed(2);
+                document.getElementById('line2Value').textContent = chartState.line2X.toFixed(2);
                 document.getElementById('rangeX').textContent = '-';
                 document.getElementById('rangeY').textContent = '-';
             }
@@ -1266,65 +1282,31 @@
                 return;
             }
 
-            // Calcola assi X e Y sui dati ORIGINALI (senza offset)
-            let dataMinX = Math.min(...chartState.data.map(p => p.x));
-            let dataMaxX = Math.max(...chartState.data.map(p => p.x));
-            let dataMinY = Math.min(...chartState.data.map(p => p.y));
-            let dataMaxY = Math.max(...chartState.data.map(p => p.y));
+            // Calcola range dati completo
+            const dataMinX = Math.min(...chartState.data.map(p => p.x));
+            const dataMaxX = Math.max(...chartState.data.map(p => p.x));
+            const dataMinY = Math.min(...chartState.data.map(p => p.y));
+            const dataMaxY = Math.max(...chartState.data.map(p => p.y));
 
-            // AUTOSCALE: includi anche segmenti offset
-            if (chartState.autoScale) {
-                // Includi survivors
-                if (chartState.offsetSurvivors && chartState.offsetSurvivors.length > 0) {
-                    chartState.offsetSurvivors.forEach(seg => {
-                        dataMinX = Math.min(dataMinX, seg.xi, seg.xf);
-                        dataMaxX = Math.max(dataMaxX, seg.xi, seg.xf);
-                        dataMinY = Math.min(dataMinY, seg.yi, seg.yf);
-                        dataMaxY = Math.max(dataMaxY, seg.yi, seg.yf);
-                    });
-                }
-                // Includi nuovo segmento
-                if (chartState.offsetNewSeg) {
-                    const ns = chartState.offsetNewSeg;
-                    dataMinX = Math.min(dataMinX, ns.xi, ns.xf);
-                    dataMaxX = Math.max(dataMaxX, ns.xi, ns.xf);
-                    dataMinY = Math.min(dataMinY, ns.yi, ns.yf);
-                    dataMaxY = Math.max(dataMaxY, ns.yi, ns.yf);
-                }
-            }
-
-            // Applica range selector X (in percentuale 0-100)
-            const fullRangeX = dataMaxX - dataMinX;
-            let minX = dataMinX + (fullRangeX * chartState.xRangeMin / 100);
-            let maxX = dataMinX + (fullRangeX * chartState.xRangeMax / 100);
-
-            // Margine 10%
-            const marginX = (maxX - minX) * 0.1;
-            minX -= marginX;
-            maxX += marginX;
-
-            // Range Y con margine
-            let minY = dataMinY - (dataMaxY - dataMinY) * 0.1;
-            let maxY = dataMaxY + (dataMaxY - dataMinY) * 0.1;
-            if (minY > 0) minY = 0; // Parti da 0 se i dati sono positivi
-
-            // SCALA UGUALE: calcola pixel per unità e usa lo stesso per entrambi gli assi
+            // Dimensioni area plot
             const plotWidth = width - 2 * padding;
             const plotHeight = height - 2 * padding;
+
+            // Max asse = max(xmax, ymax)
+            const axisMax = Math.max(dataMaxX, dataMaxY);
+
+            // Assi: da min a axisMax
+            const minX = dataMinX;
+            const maxX = axisMax;
+            const minY = dataMinY;
+            const maxY = axisMax;
             const rangeX = maxX - minX;
             const rangeY = maxY - minY;
 
-            const scaleX = plotWidth / rangeX;   // pixel per unità X
-            const scaleY = plotHeight / rangeY;  // pixel per unità Y
-
-            // Usa la scala minore per entrambi (così tutto entra)
+            // Scala uguale per entrambi gli assi
+            const scaleX = plotWidth / rangeX;
+            const scaleY = plotHeight / rangeY;
             const scale = Math.min(scaleX, scaleY);
-
-            // Centra il grafico
-            const usedWidth = rangeX * scale;
-            const usedHeight = rangeY * scale;
-            const offsetX = (plotWidth - usedWidth) / 2;
-            const offsetY = (plotHeight - usedHeight) / 2;
 
             // Applica offset Y ai dati per disegnare (l'asse rimane fisso)
             const dataWithOffset = chartState.data.map(p => ({
@@ -1371,21 +1353,21 @@
             const decimalsY = getDecimalPlaces(rangeY);
 
             for (let i = 0; i <= 5; i++) {
-                const screenX = padding + offsetX + usedWidth * (i / 5);
+                const screenX = padding + plotWidth * (i / 5);
                 const value = minX + rangeX * (i / 5);
                 ctx.fillText(value.toFixed(decimalsX), screenX, height - padding + 20);
             }
 
             ctx.textAlign = 'right';
             for (let i = 0; i <= 5; i++) {
-                const screenY = height - padding - offsetY - usedHeight * (i / 5);
+                const screenY = height - padding - plotHeight * (i / 5);
                 const value = minY + rangeY * (i / 5);
                 ctx.fillText(value.toFixed(decimalsY), padding - 10, screenY + 4);
             }
 
             // Transform con scala uguale per X e Y
-            const transformX = (x) => padding + offsetX + (x - minX) * scale;
-            const transformY = (y) => height - padding - offsetY - (y - minY) * scale;
+            const transformX = (x) => padding + (x - minX) * scale;
+            const transformY = (y) => height - padding - (y - minY) * scale;
 
             // Line - disegna segmenti separati se disponibili
             ctx.strokeStyle = '#0066cc';
@@ -1416,11 +1398,10 @@
                 ctx.stroke();
             }
 
-            // Disegna le rette offset (se presenti) - linee sottili verdi
-            if (chartState.offsetLines && chartState.offsetLines.length > 0) {
-                ctx.strokeStyle = '#88cc88';  // Verde chiaro per le rette infinite
+            // DEBUG: Disegna le rette offset (linee sottili verdi)
+            if (DEBUG_MODE && chartState.offsetLines && chartState.offsetLines.length > 0) {
+                ctx.strokeStyle = '#88cc88';
                 ctx.lineWidth = 1;
-
                 chartState.offsetLines.forEach((line, idx) => {
                     ctx.beginPath();
                     ctx.moveTo(transformX(line.x1), transformY(line.y1));
@@ -1429,8 +1410,8 @@
                 });
             }
 
-            // Disegna il nuovo segmento che si sta inserendo (ARANCIONE)
-            if (chartState.offsetNewSeg) {
+            // DEBUG: Disegna il nuovo segmento che si sta inserendo (ARANCIONE)
+            if (DEBUG_MODE && chartState.offsetNewSeg) {
                 const ns = chartState.offsetNewSeg;
                 ctx.strokeStyle = '#ff9900';
                 ctx.lineWidth = 4;
@@ -1441,7 +1422,6 @@
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                // Punti inizio/fine arancioni
                 ctx.fillStyle = '#ff9900';
                 ctx.beginPath();
                 ctx.arc(transformX(ns.xi), transformY(ns.yi), 8, 0, 2 * Math.PI);
@@ -1450,15 +1430,12 @@
                 ctx.arc(transformX(ns.xf), transformY(ns.yf), 8, 0, 2 * Math.PI);
                 ctx.fill();
 
-                // Label "NEW"
-                ctx.fillStyle = '#ff9900';
                 ctx.font = 'bold 12px Arial';
                 ctx.fillText('NEW', transformX(ns.xi) + 10, transformY(ns.yi) - 10);
             }
 
-            // Disegna i segmenti sopravvissuti con punti colorati
+            // Disegna profilo offset finale
             if (chartState.offsetSurvivors && chartState.offsetSurvivors.length > 0) {
-                // Disegna segmenti
                 ctx.strokeStyle = '#00cc00';
                 ctx.lineWidth = 3;
 
@@ -1469,27 +1446,25 @@
                     ctx.stroke();
                 });
 
-                // Disegna punti inizio (blu) e fine (rosso)
-                chartState.offsetSurvivors.forEach((seg, idx) => {
-                    // Punto inizio - BLU
-                    ctx.fillStyle = '#0000ff';
-                    ctx.beginPath();
-                    ctx.arc(transformX(seg.xi), transformY(seg.yi), 6, 0, 2 * Math.PI);
-                    ctx.fill();
+                // DEBUG: punti e numeri
+                if (DEBUG_MODE) {
+                    chartState.offsetSurvivors.forEach((seg, idx) => {
+                        ctx.fillStyle = '#0000ff';
+                        ctx.beginPath();
+                        ctx.arc(transformX(seg.xi), transformY(seg.yi), 6, 0, 2 * Math.PI);
+                        ctx.fill();
 
-                    // Punto fine - ROSSO
-                    ctx.fillStyle = '#ff0000';
-                    ctx.beginPath();
-                    ctx.arc(transformX(seg.xf), transformY(seg.yf), 6, 0, 2 * Math.PI);
-                    ctx.fill();
+                        ctx.fillStyle = '#ff0000';
+                        ctx.beginPath();
+                        ctx.arc(transformX(seg.xf), transformY(seg.yf), 6, 0, 2 * Math.PI);
+                        ctx.fill();
 
-                    // Numero segmento
-                    ctx.fillStyle = '#000';
-                    ctx.font = '10px Arial';
-                    ctx.fillText(idx.toString(), transformX(seg.xi) + 8, transformY(seg.yi) - 8);
-                });
-
-                console.log('Disegnati', chartState.offsetSurvivors.length, 'segmenti sopravvissuti');
+                        ctx.fillStyle = '#000';
+                        ctx.font = '10px Arial';
+                        ctx.fillText(idx.toString(), transformX(seg.xi) + 8, transformY(seg.yi) - 8);
+                    });
+                    console.log('Disegnati', chartState.offsetSurvivors.length, 'segmenti sopravvissuti');
+                }
             } else if (chartState.offsetPolyline && chartState.offsetPolyline.length > 1) {
                 // Fallback: disegna polilinea se non ci sono survivors
                 ctx.strokeStyle = '#00cc00';
@@ -1606,6 +1581,22 @@
             document.getElementById('fileName').textContent = file.name;
             document.getElementById('connectionStatus').textContent = 'Caricamento CSV...';
 
+            // Reset completo stato offset
+            chartState.offsetY = 0;
+            chartState.offsetLines = [];
+            chartState.offsetPolyline = [];
+            chartState.offsetSurvivors = [];
+            chartState.offsetNewSeg = null;
+            document.getElementById('offsetYInput').value = 0;
+
+            // Reset step state
+            if (stepState) {
+                stepState.initialized = false;
+                stepState.currentIdx = 0;
+                stepState.offsetSegs = [];
+                stepState.survivors = [];
+            }
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
@@ -1641,9 +1632,21 @@
                     lastLoadType = 'dxf';
                     lastCsvData = null;  // Reset CSV quando carichi DXF
 
-                    // Reset offset Y a 0
+                    // Reset completo stato offset
                     chartState.offsetY = 0;
+                    chartState.offsetLines = [];
+                    chartState.offsetPolyline = [];
+                    chartState.offsetSurvivors = [];
+                    chartState.offsetNewSeg = null;
                     document.getElementById('offsetYInput').value = 0;
+
+                    // Reset step state
+                    if (stepState) {
+                        stepState.initialized = false;
+                        stepState.currentIdx = 0;
+                        stepState.offsetSegs = [];
+                        stepState.survivors = [];
+                    }
 
                     console.log('DXF salvato per refresh. lastLoadType:', lastLoadType);
                     parseDXF(dxfString, file.name);
@@ -2343,26 +2346,15 @@
         }
 
         // ===== MOUSE DRAG PER LINEE VERTICALI =====
-        // Helper function per calcolare il range X visibile con zoom applicato
+        // Helper function per calcolare il range X visibile (uguale a drawChart)
         function getVisibleXRange() {
-            // Calcola range dati completo
-            let minX = Math.min(...chartState.data.map(p => p.x));
-            let maxX = Math.max(...chartState.data.map(p => p.x));
+            const dataMinX = Math.min(...chartState.data.map(p => p.x));
+            const dataMaxX = Math.max(...chartState.data.map(p => p.x));
+            const dataMaxY = Math.max(...chartState.data.map(p => p.y));
 
-            // Applica range selector X (zoom)
-            const dataMinX = minX;
-            const dataMaxX = maxX;
-            const dataRangeX = dataMaxX - dataMinX;
-
-            minX = dataMinX + (dataRangeX * chartState.xRangeMin / 100);
-            maxX = dataMinX + (dataRangeX * chartState.xRangeMax / 100);
-
-            // Aggiungi margine 10%
-            const marginX = (maxX - minX) * 0.1;
-            minX -= marginX;
-            maxX += marginX;
-
-            return { minX, maxX };
+            // Max asse = max(xmax, ymax)
+            const axisMax = Math.max(dataMaxX, dataMaxY);
+            return { minX: dataMinX, maxX: axisMax };
         }
 
         canvas.addEventListener('mousedown', function(e) {
@@ -2405,12 +2397,16 @@
 
                 const dataX = minX + (maxX - minX) * ((mouseX - padding) / (width - 2 * padding));
 
+                // Calcola decimali appropriati
+                const rangeX = maxX - minX;
+                const decimals = getDecimalPlaces(rangeX);
+
                 if (isDraggingLine === 'line1') {
                     chartState.line1X = dataX;
-                    document.getElementById('line1Input').value = dataX.toFixed(0);
+                    document.getElementById('line1Input').value = dataX.toFixed(decimals);
                 } else if (isDraggingLine === 'line2') {
                     chartState.line2X = dataX;
-                    document.getElementById('line2Input').value = dataX.toFixed(0);
+                    document.getElementById('line2Input').value = dataX.toFixed(decimals);
                 }
 
                 updateUI();
@@ -2501,12 +2497,13 @@
         // Carica automaticamente all'avvio
         window.addEventListener('load', function() {
             console.log('Widget caricato - Pronto per upload DXF o caricamento CSV');
+            console.log('DEBUG_MODE:', DEBUG_MODE, '(usa ?debug=true per attivare)');
             updateRangeSelector();
-            // Commenta l'auto-load CSV se vuoi solo upload DXF
-            // loadCSVData();
 
-            // Commenta l'auto-refresh se vuoi solo upload manuale
-            // setInterval(loadCSVData, 2000);
+            // Mostra bottoni debug se DEBUG_MODE
+            if (DEBUG_MODE) {
+                document.getElementById('debugButtons').style.display = 'block';
+            }
         });
 
         // Aggiorna range selector quando la finestra viene ridimensionata
