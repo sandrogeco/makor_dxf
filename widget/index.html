@@ -2324,17 +2324,25 @@
                 console.log('Limiti X:', minLimitX, 'a', maxLimitX);
                 console.log('Offset Y:', chartState.offsetY);
 
-                // Raccogli tutti i punti (da segmenti o da data)
+                // Raccogli punti: se c'è offset polyline usa quella, altrimenti dati originali
                 let allPoints = [];
-                if (chartState.segments && chartState.segments.length > 0) {
+                if (chartState.offsetPolyline && chartState.offsetPolyline.length > 0) {
+                    // Esporta polilinea offset
+                    console.log('Esporto polilinea offset:', chartState.offsetPolyline.length, 'punti');
+                    chartState.offsetPolyline.forEach(point => {
+                        allPoints.push({ x: point.x, y: point.y });
+                    });
+                } else if (chartState.segments && chartState.segments.length > 0) {
+                    // Esporta segmenti originali
                     chartState.segments.forEach(segment => {
                         segment.points.forEach(point => {
-                            allPoints.push({ x: point.x, y: point.y + chartState.offsetY });
+                            allPoints.push({ x: point.x, y: point.y });
                         });
                     });
                 } else {
+                    // Esporta dati originali
                     chartState.data.forEach(point => {
-                        allPoints.push({ x: point.x, y: point.y + chartState.offsetY });
+                        allPoints.push({ x: point.x, y: point.y });
                     });
                 }
 
