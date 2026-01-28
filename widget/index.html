@@ -523,7 +523,12 @@
             line1X: 0,
             line2X: 100,
             xRangeMin: 0,   // 0% = inizio dati
-            xRangeMax: 100  // 100% = fine dati
+            xRangeMax: 100, // 100% = fine dati
+            // Limiti assi fissi (impostati solo al caricamento file)
+            axisMinX: 0,
+            axisMaxX: 100,
+            axisMinY: 0,
+            axisMaxY: 100
         };
 
         let INTERPOLATION_STEP = 0.005;
@@ -620,14 +625,27 @@
             console.log('CSV parsato: ' + chartState.data.length + ' punti (ordinati per X)');
             document.getElementById('connectionStatus').textContent = 'CSV caricato (' + chartState.data.length + ' punti)';
 
-            // Inizializza limiti orizzontali a min(x) e max(x)
+            // Inizializza limiti assi e linee al caricamento
             if (chartState.data.length > 0) {
-                const minX = chartState.data[0].x;
-                const maxX = chartState.data[chartState.data.length - 1].x;
-                chartState.line1X = minX;
-                chartState.line2X = maxX;
-                document.getElementById('line1Input').value = minX.toFixed(3);
-                document.getElementById('line2Input').value = maxX.toFixed(3);
+                const xValues = chartState.data.map(p => p.x);
+                const yValues = chartState.data.map(p => p.y);
+                const dataMinX = Math.min(...xValues);
+                const dataMaxX = Math.max(...xValues);
+                const dataMinY = Math.min(...yValues);
+                const dataMaxY = Math.max(...yValues);
+
+                // Limiti assi: max = max(xmax, ymax)
+                const axisMax = Math.max(dataMaxX, dataMaxY);
+                chartState.axisMinX = dataMinX;
+                chartState.axisMaxX = axisMax;
+                chartState.axisMinY = dataMinY;
+                chartState.axisMaxY = axisMax;
+
+                // Linee verticali ai limiti dati
+                chartState.line1X = dataMinX;
+                chartState.line2X = dataMaxX;
+                document.getElementById('line1Input').value = dataMinX.toFixed(3);
+                document.getElementById('line2Input').value = dataMaxX.toFixed(3);
             }
 
             updateUI();
@@ -1282,26 +1300,27 @@
                 return;
             }
 
-            // Calcola range dati completo
-            const dataMinX = Math.min(...chartState.data.map(p => p.x));
-            const dataMaxX = Math.max(...chartState.data.map(p => p.x));
-            const dataMinY = Math.min(...chartState.data.map(p => p.y));
-            const dataMaxY = Math.max(...chartState.data.map(p => p.y));
+            // Limiti assi fissi (impostati al caricamento file)
+            const axisMinX = chartState.axisMinX;
+            const axisMaxX = chartState.axisMaxX;
+            const axisMinY = chartState.axisMinY;
+            const axisMaxY = chartState.axisMaxY;
+            const fullRangeX = axisMaxX - axisMinX;
+            const fullRangeY = axisMaxY - axisMinY;
+
+            // Applica scroll/zoom (xRangeMin/xRangeMax in percentuale 0-100)
+            const minX = axisMinX + (fullRangeX * chartState.xRangeMin / 100);
+            const maxX = axisMinX + (fullRangeX * chartState.xRangeMax / 100);
+            const rangeX = maxX - minX;
+
+            // Y segue stessa proporzione
+            const minY = axisMinY + (fullRangeY * chartState.xRangeMin / 100);
+            const maxY = axisMinY + (fullRangeY * chartState.xRangeMax / 100);
+            const rangeY = maxY - minY;
 
             // Dimensioni area plot
             const plotWidth = width - 2 * padding;
             const plotHeight = height - 2 * padding;
-
-            // Max asse = max(xmax, ymax)
-            const axisMax = Math.max(dataMaxX, dataMaxY);
-
-            // Assi: da min a axisMax
-            const minX = dataMinX;
-            const maxX = axisMax;
-            const minY = dataMinY;
-            const maxY = axisMax;
-            const rangeX = maxX - minX;
-            const rangeY = maxY - minY;
 
             // Scala uguale per entrambi gli assi
             const scaleX = plotWidth / rangeX;
@@ -1708,6 +1727,9 @@
 
         function parseDXF(dxfString, fileName) {
             try {
+                // Leggi passo interpolazione dal campo input
+                INTERPOLATION_STEP = parseFloat(document.getElementById('interpolationInput').value) || 0.005;
+
                 console.log('=== PARSING DXF (Parser Nativo) ===');
                 console.log('File:', fileName);
                 console.log('Dimensione file:', dxfString.length, 'caratteri');
@@ -1830,7 +1852,14 @@
                 const minY = Math.min(...yPoints);
                 const maxY = Math.max(...yPoints);
 
-                // Inizializza limiti orizzontali a min(x) e max(x)
+                // Limiti assi: max = max(xmax, ymax)
+                const axisMax = Math.max(maxX, maxY);
+                chartState.axisMinX = minX;
+                chartState.axisMaxX = axisMax;
+                chartState.axisMinY = minY;
+                chartState.axisMaxY = axisMax;
+
+                // Inizializza linee verticali ai limiti dati
                 chartState.line1X = minX;
                 chartState.line2X = maxX;
                 document.getElementById('line1Input').value = minX.toFixed(3);
@@ -2346,15 +2375,12 @@
         }
 
         // ===== MOUSE DRAG PER LINEE VERTICALI =====
-        // Helper function per calcolare il range X visibile (uguale a drawChart)
+        // Helper function per calcolare il range X visibile (con scroll applicato)
         function getVisibleXRange() {
-            const dataMinX = Math.min(...chartState.data.map(p => p.x));
-            const dataMaxX = Math.max(...chartState.data.map(p => p.x));
-            const dataMaxY = Math.max(...chartState.data.map(p => p.y));
-
-            // Max asse = max(xmax, ymax)
-            const axisMax = Math.max(dataMaxX, dataMaxY);
-            return { minX: dataMinX, maxX: axisMax };
+            const fullRangeX = chartState.axisMaxX - chartState.axisMinX;
+            const minX = chartState.axisMinX + (fullRangeX * chartState.xRangeMin / 100);
+            const maxX = chartState.axisMinX + (fullRangeX * chartState.xRangeMax / 100);
+            return { minX, maxX };
         }
 
         canvas.addEventListener('mousedown', function(e) {
@@ -2362,14 +2388,25 @@
 
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
             const padding = 60;
             const width = rect.width;
+            const height = rect.height;
+            const plotWidth = width - 2 * padding;
+            const plotHeight = height - 2 * padding;
 
-            // Calcola posizioni linee sullo schermo con zoom applicato
+            // Calcola range visibile e scala (come in drawChart)
             const { minX, maxX } = getVisibleXRange();
+            const rangeX = maxX - minX;
+            const fullRangeY = chartState.axisMaxY - chartState.axisMinY;
+            const minY = chartState.axisMinY + (fullRangeY * chartState.xRangeMin / 100);
+            const maxY = chartState.axisMinY + (fullRangeY * chartState.xRangeMax / 100);
+            const rangeY = maxY - minY;
 
-            const transformX = (x) => padding + (width - 2 * padding) * ((x - minX) / (maxX - minX));
+            const scaleX = plotWidth / rangeX;
+            const scaleY = plotHeight / rangeY;
+            const scale = Math.min(scaleX, scaleY);
+
+            const transformX = (x) => padding + (x - minX) * scale;
             const line1ScreenX = transformX(chartState.line1X);
             const line2ScreenX = transformX(chartState.line2X);
 
@@ -2390,15 +2427,27 @@
             const mouseX = e.clientX - rect.left;
             const padding = 60;
             const width = rect.width;
+            const height = rect.height;
+            const plotWidth = width - 2 * padding;
+            const plotHeight = height - 2 * padding;
+
+            // Calcola range visibile e scala (come in drawChart)
+            const { minX, maxX } = getVisibleXRange();
+            const rangeX = maxX - minX;
+            const fullRangeY = chartState.axisMaxY - chartState.axisMinY;
+            const minY = chartState.axisMinY + (fullRangeY * chartState.xRangeMin / 100);
+            const maxY = chartState.axisMinY + (fullRangeY * chartState.xRangeMax / 100);
+            const rangeY = maxY - minY;
+
+            const scaleX = plotWidth / rangeX;
+            const scaleY = plotHeight / rangeY;
+            const scale = Math.min(scaleX, scaleY);
+
+            const transformX = (x) => padding + (x - minX) * scale;
+            const inverseTransformX = (screenX) => minX + (screenX - padding) / scale;
 
             if (isDraggingLine) {
-                // Calcola valore X dai dati con zoom applicato
-                const { minX, maxX } = getVisibleXRange();
-
-                const dataX = minX + (maxX - minX) * ((mouseX - padding) / (width - 2 * padding));
-
-                // Calcola decimali appropriati
-                const rangeX = maxX - minX;
+                const dataX = inverseTransformX(mouseX);
                 const decimals = getDecimalPlaces(rangeX);
 
                 if (isDraggingLine === 'line1') {
@@ -2412,10 +2461,7 @@
                 updateUI();
                 drawChart();
             } else {
-                // Mostra cursore resize se vicino a una linea con zoom applicato
-                const { minX, maxX } = getVisibleXRange();
-
-                const transformX = (x) => padding + (width - 2 * padding) * ((x - minX) / (maxX - minX));
+                // Mostra cursore resize se vicino a una linea
                 const line1ScreenX = transformX(chartState.line1X);
                 const line2ScreenX = transformX(chartState.line2X);
 
