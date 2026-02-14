@@ -2309,7 +2309,7 @@
             }
         }
 
-        function downloadCSV() {
+        async function downloadCSV() {
             if (chartState.data.length === 0) {
                 alert('Nessun dato disponibile. Carica prima un file DXF.');
                 return;
@@ -2364,20 +2364,43 @@
                     csv += point.x.toFixed(6) + ',' + point.y.toFixed(6) + '\n';
                 });
 
-                // Crea blob e scarica
-                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-
-                // Nome file con timestamp
+                // Chiedi nome file all'utente
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-                a.download = `dxf_export_${timestamp}.csv`;
+                const defaultName = `dxf_export_${timestamp}.csv`;
 
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+                // Usa File System Access API se disponibile (permette di scegliere destinazione)
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: defaultName,
+                            types: [{
+                                description: 'File CSV',
+                                accept: { 'text/csv': ['.csv'] }
+                            }]
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                    } catch (e) {
+                        if (e.name === 'AbortError') return; // Utente ha annullato
+                        throw e;
+                    }
+                } else {
+                    // Fallback: chiedi almeno il nome file
+                    const fileName = prompt('Nome del file CSV:', defaultName);
+                    if (!fileName) return; // Utente ha annullato
+
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName.endsWith('.csv') ? fileName : fileName + '.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }
 
                 console.log('CSV scaricato: ' + allPoints.length + ' punti (X crescente)');
                 document.getElementById('connectionStatus').textContent = 'CSV esportato (' + allPoints.length + ' punti)';
