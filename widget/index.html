@@ -508,8 +508,23 @@
     </div>
 
     <script>
-        // Debug mode da URL: ?debug=true
-        const DEBUG_MODE = new URLSearchParams(window.location.search).get('debug') === 'true';
+        // Parametri da URL
+        const _params = new URLSearchParams(window.location.search);
+        const DEBUG_MODE = _params.get('debug') === 'true';
+        const PARAM_LARGHEZZA = _params.get('larghezza') ? parseInt(_params.get('larghezza')) : null;
+        const PARAM_ALTEZZA   = _params.get('altezza')   ? parseInt(_params.get('altezza'))   : null;
+        const PARAM_LINGUA    = _params.get('lingua')    || null; // non usato al momento
+        const PARAM_UM        = _params.get('um')        || null; // non usato al momento
+
+        // Applica larghezza al container
+        if (PARAM_LARGHEZZA) {
+            const container = document.querySelector('.widget-container');
+            if (container) container.style.maxWidth = PARAM_LARGHEZZA + 'px';
+        }
+        // Applica altezza al canvas
+        if (PARAM_ALTEZZA) {
+            document.getElementById('chartCanvas').style.height = PARAM_ALTEZZA + 'px';
+        }
 
         let chartState = {
             data: [],
