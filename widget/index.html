@@ -423,6 +423,7 @@
             </div>
         </div>
 
+
         <div class="chart-area">
             <canvas id="chartCanvas"></canvas>
             <!-- Range Selector sotto il grafico -->
@@ -587,7 +588,9 @@
             return map;
         }
         const _params = _parseParams();
-        const DEBUG_MODE = _params['debug'] === 'true';
+        const DEBUG_MODE    = _params['debug']     === 'true';
+        const PARAM_MODE    = _params['mode']      || null;   // 'viewer' per modalità solo grafico
+        const PARAM_CSV     = _params['csv']       || null;   // URL CSV da caricare automaticamente
         const PARAM_LARGHEZZA = _params['larghezza'] ? parseInt(_params['larghezza']) : null;
         const PARAM_ALTEZZA   = _params['altezza']   ? parseInt(_params['altezza'])   : null;
         const PARAM_LINGUA    = _params['lingua']    || null; // non usato al momento
@@ -2683,6 +2686,23 @@
             // Mostra bottoni debug se DEBUG_MODE
             if (DEBUG_MODE) {
                 document.getElementById('debugButtons').style.display = 'block';
+            }
+
+            // Modalità viewer: nascondi controlli, mostra solo toolbar CSV
+            if (PARAM_MODE === 'viewer') {
+                document.querySelector('.controls-panel').style.display = 'none';
+                document.querySelector('.info-panel').style.display = 'none';
+                document.querySelector('.range-selector-container').style.display = 'none';
+                // Auto-carica CSV da URL se passato come parametro
+                if (PARAM_CSV) {
+                    document.getElementById('connectionStatus').textContent = 'Caricamento CSV...';
+                    fetch(PARAM_CSV + '?' + new Date().getTime())
+                        .then(r => { if (!r.ok) throw new Error('File non trovato'); return r.text(); })
+                        .then(text => parseCSV(text))
+                        .catch(err => {
+                            document.getElementById('connectionStatus').textContent = 'ERRORE: ' + err.message;
+                        });
+                }
             }
 
             // Listener per input tastierino (sostituiscono gli oninput rimossi dagli attributi)
