@@ -570,13 +570,27 @@
     </div>
 
     <script>
-        // Parametri da URL
-        const _params = new URLSearchParams(window.location.search);
-        const DEBUG_MODE = _params.get('debug') === 'true';
-        const PARAM_LARGHEZZA = _params.get('larghezza') ? parseInt(_params.get('larghezza')) : null;
-        const PARAM_ALTEZZA   = _params.get('altezza')   ? parseInt(_params.get('altezza'))   : null;
-        const PARAM_LINGUA    = _params.get('lingua')    || null; // non usato al momento
-        const PARAM_UM        = _params.get('um')        || null; // non usato al momento
+        // Parametri da URL: supporta sia ?key=val&... che #key=val;...
+        function _parseParams() {
+            const map = {};
+            // hash: #key=val;key=val (separatore ;)
+            const hash = window.location.hash.slice(1);
+            if (hash) {
+                hash.split(';').forEach(p => {
+                    const [k, v] = p.split('=');
+                    if (k) map[k.trim()] = v !== undefined ? decodeURIComponent(v.trim()) : '';
+                });
+            }
+            // query string: ?key=val&key=val (fallback / compatibilità)
+            new URLSearchParams(window.location.search).forEach((v, k) => { map[k] = v; });
+            return map;
+        }
+        const _params = _parseParams();
+        const DEBUG_MODE = _params['debug'] === 'true';
+        const PARAM_LARGHEZZA = _params['larghezza'] ? parseInt(_params['larghezza']) : null;
+        const PARAM_ALTEZZA   = _params['altezza']   ? parseInt(_params['altezza'])   : null;
+        const PARAM_LINGUA    = _params['lingua']    || null; // non usato al momento
+        const PARAM_UM        = _params['um']        || null; // non usato al momento
 
         // Applica larghezza al container
         if (PARAM_LARGHEZZA) {
