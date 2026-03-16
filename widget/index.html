@@ -587,24 +587,54 @@
             new URLSearchParams(window.location.search).forEach((v, k) => { map[k] = v; });
             return map;
         }
-        const _params = _parseParams();
-        const DEBUG_MODE    = _params['debug']     === 'true';
-        const PARAM_MODE    = _params['mode']      || null;   // 'viewer' per modalità solo grafico
-        const PARAM_CSV     = _params['csv']       || null;   // URL CSV da caricare automaticamente
-        const PARAM_LARGHEZZA = _params['larghezza'] ? parseInt(_params['larghezza']) : null;
-        const PARAM_ALTEZZA   = _params['altezza']   ? parseInt(_params['altezza'])   : null;
-        const PARAM_LINGUA    = _params['lingua']    || null; // non usato al momento
-        const PARAM_UM        = _params['um']        || null; // non usato al momento
+        let DEBUG_MODE, PARAM_MODE, PARAM_CSV, PARAM_LARGHEZZA, PARAM_ALTEZZA, PARAM_LINGUA, PARAM_UM;
 
-        // Applica larghezza al container
-        if (PARAM_LARGHEZZA) {
+        function applyParams() {
+            const p = _parseParams();
+            DEBUG_MODE      = p['debug']     === 'true';
+            PARAM_MODE      = p['mode']      || null;
+            PARAM_CSV       = p['csv']       || null;
+            PARAM_LARGHEZZA = p['larghezza'] ? parseInt(p['larghezza']) : null;
+            PARAM_ALTEZZA   = p['altezza']   ? parseInt(p['altezza'])   : null;
+            PARAM_LINGUA    = p['lingua']    || null;
+            PARAM_UM        = p['um']        || null;
+
+            // Larghezza container
             const container = document.querySelector('.widget-container');
-            if (container) container.style.maxWidth = PARAM_LARGHEZZA + 'px';
+            if (container) container.style.maxWidth = PARAM_LARGHEZZA ? PARAM_LARGHEZZA + 'px' : '';
+
+            // Altezza canvas
+            document.getElementById('chartCanvas').style.height = PARAM_ALTEZZA ? PARAM_ALTEZZA + 'px' : '500px';
+
+            // Modalità viewer
+            const controlsPanel  = document.querySelector('.controls-panel');
+            const infoPanel      = document.querySelector('.info-panel');
+            const rangeContainer = document.querySelector('.range-selector-container');
+            if (PARAM_MODE === 'viewer') {
+                if (controlsPanel)  controlsPanel.style.display  = 'none';
+                if (infoPanel)      infoPanel.style.display      = 'none';
+                if (rangeContainer) rangeContainer.style.display = 'none';
+                // Auto-carica CSV
+                if (PARAM_CSV) {
+                    document.getElementById('connectionStatus').textContent = 'Caricamento CSV...';
+                    let csvUrl = PARAM_CSV;
+                    if (/^[a-zA-Z]:[\\\/]/.test(csvUrl))
+                        csvUrl = 'file:///' + csvUrl.replace(/\\/g, '/');
+                    fetch(csvUrl + (csvUrl.startsWith('file') ? '' : '?' + new Date().getTime()))
+                        .then(r => { if (!r.ok) throw new Error('File non trovato'); return r.text(); })
+                        .then(text => parseCSV(text))
+                        .catch(err => {
+                            document.getElementById('connectionStatus').textContent = 'ERRORE: ' + err.message;
+                        });
+                }
+            } else {
+                if (controlsPanel)  controlsPanel.style.display  = '';
+                if (infoPanel)      infoPanel.style.display      = '';
+                if (rangeContainer) rangeContainer.style.display = '';
+            }
         }
-        // Applica altezza al canvas
-        if (PARAM_ALTEZZA) {
-            document.getElementById('chartCanvas').style.height = PARAM_ALTEZZA + 'px';
-        }
+
+        applyParams();
 
         let chartState = {
             data: [],
@@ -2688,22 +2718,7 @@
                 document.getElementById('debugButtons').style.display = 'block';
             }
 
-            // Modalità viewer: nascondi controlli, mostra solo toolbar CSV
-            if (PARAM_MODE === 'viewer') {
-                document.querySelector('.controls-panel').style.display = 'none';
-                document.querySelector('.info-panel').style.display = 'none';
-                document.querySelector('.range-selector-container').style.display = 'none';
-                // Auto-carica CSV da URL se passato come parametro
-                if (PARAM_CSV) {
-                    document.getElementById('connectionStatus').textContent = 'Caricamento CSV...';
-                    fetch(PARAM_CSV + '?' + new Date().getTime())
-                        .then(r => { if (!r.ok) throw new Error('File non trovato'); return r.text(); })
-                        .then(text => parseCSV(text))
-                        .catch(err => {
-                            document.getElementById('connectionStatus').textContent = 'ERRORE: ' + err.message;
-                        });
-                }
-            }
+            applyParams();
 
             // Listener per input tastierino (sostituiscono gli oninput rimossi dagli attributi)
             document.getElementById('interpolationInput').addEventListener('input', function() {
@@ -2720,6 +2735,11 @@
         // Aggiorna range selector quando la finestra viene ridimensionata
         window.addEventListener('resize', function() {
             updateRangeSelector();
+        });
+
+        // Riapplica parametri se l'app cambia l'hash senza ricaricare la pagina
+        window.addEventListener('hashchange', function() {
+            applyParams();
         });
 
         // ===== TASTIERINO NUMERICO =====
