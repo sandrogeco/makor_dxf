@@ -572,6 +572,17 @@
     </div>
 
     <script>
+        // Alias numerici per le chiavi parametro
+        const _paramAlias = {
+            '0': 'larghezza',
+            '1': 'altezza',
+            '2': 'lingua',
+            '3': 'um',
+            '4': 'mode',
+            '5': 'csv',
+            '6': 'debug'
+        };
+
         // Parametri da URL: supporta sia ?key=val&... che #key=val;...
         function _parseParams() {
             const map = {};
@@ -585,7 +596,7 @@
                     if (idx < 0) return;
                     const k = p.slice(0, idx).trim();
                     const v = p.slice(idx + 1).trim();
-                    if (k) map[k] = decodeURIComponent(v);
+                    if (k) map[_paramAlias[k] || k] = decodeURIComponent(v);
                 });
             }
             // query string: ?key=val&key=val (fallback / compatibilità)
