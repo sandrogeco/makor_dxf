@@ -579,8 +579,13 @@
             const hash = window.location.hash.slice(1);
             if (hash) {
                 hash.split(';').forEach(p => {
-                    const [k, v] = p.split('=');
-                    if (k) map[k.trim()] = v !== undefined ? decodeURIComponent(v.trim()) : '';
+                    // supporta sia key=value che key:value
+                    const sep = p.includes('=') ? '=' : ':';
+                    const idx = p.indexOf(sep);
+                    if (idx < 0) return;
+                    const k = p.slice(0, idx).trim();
+                    const v = p.slice(idx + 1).trim();
+                    if (k) map[k] = decodeURIComponent(v);
                 });
             }
             // query string: ?key=val&key=val (fallback / compatibilità)
