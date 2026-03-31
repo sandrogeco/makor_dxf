@@ -70,8 +70,9 @@ public class Publish : BaseNetLogic
         {
             try
             {
-                var tag1 = Project.Current.GetVariable("Model/VariabiliRicetta/nomeFilePunti").Value;
-                var tag2 = Project.Current.GetVariable("Model/VariabiliRicetta/velX").Value;
+                string tag1Str = (((UAManagedCore.UAValue)Project.Current.GetVariable("Model/VariabiliRicetta/nomeFilePunti").Value).Value ?? "").ToString().Replace("\\", "\\\\");
+                float tag2Val = Convert.ToSingle(((UAManagedCore.UAValue)Project.Current.GetVariable("Model/VariabiliRicetta/velX").Value).Value);
+                string tag2Str = tag2Val.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
                 object raw = Project.Current.GetVariable("Model/Profilo/xyGraph").Value;
                 float[,] punti = ((UAManagedCore.UAValue)raw).Value as float[,];
@@ -82,8 +83,7 @@ public class Publish : BaseNetLogic
                         punti[i, 0].ToString(System.Globalization.CultureInfo.InvariantCulture) + "," +
                         punti[i, 1].ToString(System.Globalization.CultureInfo.InvariantCulture) + "]";
 
-                var tag1Str = tag1.ToString().Replace("\\", "\\\\");
-                var json = $"{{\"nomeFilePunti\":\"{tag1Str}\",\"VelX\":{tag2},\"points\":[{string.Join(",", pts)}]}}";
+                var json = $"{{\"nomeFilePunti\":\"{tag1Str}\",\"VelX\":{tag2Str},\"points\":[{string.Join(",", pts)}]}}";
                 var buf = System.Text.Encoding.UTF8.GetBytes(json);
                 await ws.SendAsync(new ArraySegment<byte>(buf),
                     WebSocketMessageType.Text, true, CancellationToken.None);
