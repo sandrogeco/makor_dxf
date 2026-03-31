@@ -580,7 +580,8 @@
             '3': 'um',
             '4': 'mode',
             '5': 'csv',
-            '6': 'debug'
+            '6': 'debug',
+            '7': 'endpoint'
         };
 
         // Parametri da URL: supporta sia ?key=val&... che #key=val;...
@@ -603,7 +604,8 @@
             new URLSearchParams(window.location.search).forEach((v, k) => { map[k] = v; });
             return map;
         }
-        let DEBUG_MODE, PARAM_MODE, PARAM_CSV, PARAM_LARGHEZZA, PARAM_ALTEZZA, PARAM_LINGUA, PARAM_UM;
+        let DEBUG_MODE, PARAM_MODE, PARAM_CSV, PARAM_LARGHEZZA, PARAM_ALTEZZA, PARAM_LINGUA, PARAM_UM, PARAM_ENDPOINT;
+        let _opcInterval = null;
 
         function applyParams() {
             const p = _parseParams();
@@ -614,6 +616,7 @@
             PARAM_ALTEZZA   = p['altezza']   ? parseInt(p['altezza'])   : null;
             PARAM_LINGUA    = p['lingua']    || null;
             PARAM_UM        = p['um']        || null;
+            PARAM_ENDPOINT  = p['endpoint']  || 'http://localhost:8765/';
 
             // Larghezza container
             const container = document.querySelector('.widget-container');
@@ -643,10 +646,48 @@
                             document.getElementById('connectionStatus').textContent = 'ERRORE: ' + err.message;
                         });
                 }
+            } else if (PARAM_MODE === 'opc') {
+                if (controlsPanel)  controlsPanel.style.display  = 'none';
+                if (infoPanel)      infoPanel.style.display      = 'none';
+                if (rangeContainer) rangeContainer.style.display = 'none';
+
+                if (_opcInterval) { clearInterval(_opcInterval); _opcInterval = null; }
+
+                function fetchOpc() {
+                    fetch(PARAM_ENDPOINT + '?t=' + Date.now())
+                        .then(r => { if (!r.ok) throw new Error('Endpoint non raggiungibile'); return r.json(); })
+                        .then(json => {
+                            // json = { points: [[x0,y0],[x1,y1],...] }
+                            chartState.data = json.points
+                                .filter(p => !isNaN(p[0]) && !isNaN(p[1]))
+                                .map(p => ({ x: p[0], y: p[1] }));
+                            chartState.segments = [];
+                            chartState.offsetPolyline = [];
+                            chartState.offsetSurvivors = [];
+                            if (chartState.data.length > 0) {
+                                const xs = chartState.data.map(p => p.x);
+                                const ys = chartState.data.map(p => p.y);
+                                const axisMax = Math.max(...xs, ...ys);
+                                chartState.axisMinX = 0; chartState.axisMaxX = axisMax;
+                                chartState.axisMinY = 0; chartState.axisMaxY = axisMax;
+                            }
+                            document.getElementById('connectionStatus').textContent =
+                                'OPC: ' + chartState.data.length + ' punti';
+                            drawChart();
+                        })
+                        .catch(err => {
+                            document.getElementById('connectionStatus').textContent = 'ERRORE: ' + err.message;
+                        });
+                }
+
+                fetchOpc();
+                _opcInterval = setInterval(fetchOpc, 2000);
+
             } else {
                 if (controlsPanel)  controlsPanel.style.display  = '';
                 if (infoPanel)      infoPanel.style.display      = '';
                 if (rangeContainer) rangeContainer.style.display = '';
+                if (_opcInterval) { clearInterval(_opcInterval); _opcInterval = null; }
             }
         }
 
