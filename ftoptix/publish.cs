@@ -82,7 +82,8 @@ public class Publish : BaseNetLogic
                         punti[i, 0].ToString(System.Globalization.CultureInfo.InvariantCulture) + "," +
                         punti[i, 1].ToString(System.Globalization.CultureInfo.InvariantCulture) + "]";
 
-                var json = $"{{\"nomeFilePunti\":\"{tag1}\",\"VelX\":{tag2},\"points\":[{string.Join(",", pts)}]}}";
+                var tag1Str = tag1.ToString().Replace("\\", "\\\\");
+                var json = $"{{\"nomeFilePunti\":\"{tag1Str}\",\"VelX\":{tag2},\"points\":[{string.Join(",", pts)}]}}";
                 var buf = System.Text.Encoding.UTF8.GetBytes(json);
                 await ws.SendAsync(new ArraySegment<byte>(buf),
                     WebSocketMessageType.Text, true, CancellationToken.None);
