@@ -1,16 +1,40 @@
-using System.Net.Sockets;
-using System.Threading;
+#region Using directives
+using System;
 using UAManagedCore;
+using OpcUa = UAManagedCore.OpcUa;
+using FTOptix.UI;
+using FTOptix.HMIProject;
 using FTOptix.NetLogic;
+using FTOptix.NativeUI;
+using FTOptix.WebUI;
+using FTOptix.CommunicationDriver;
+using FTOptix.Alarm;
+using FTOptix.CoreBase;
+using FTOptix.CODESYS;
+using FTOptix.S7TiaProfinet;
+using FTOptix.SQLiteStore;
+using FTOptix.Store;
+using FTOptix.ODBCStore;
+using FTOptix.OPCUAServer;
+using FTOptix.OPCUAClient;
+using FTOptix.Retentivity;
+using FTOptix.EventLogger;
+using FTOptix.Core;
+using System.Net;
+using System.Net.WebSockets;
+using System.Threading;
+using System.Threading.Tasks;
+#endregion
 
-public class publish : BaseNetLogic
+public class Publish : BaseNetLogic
 {
-    private TcpListener listener;
+    private HttpListener listener;
     private Thread listenerThread;
 
     public override void Start()
     {
-        listener = new TcpListener(System.Net.IPAddress.Loopback, 8765);
+        listener = new HttpListener();
+        listener.Prefixes.Add("http://localhost:8765/");
         listener.Start();
         listenerThread = new Thread(ListenLoop) { IsBackground = true };
         listenerThread.Start();
@@ -23,39 +47,51 @@ public class publish : BaseNetLogic
 
     private void ListenLoop()
     {
-        while (true)
+        while (listener.IsListening)
         {
             try
             {
-                var client = listener.AcceptTcpClient();
-                var stream = client.GetStream();
-
-                object raw = Project.Current
-                    .GetVariable("Model/NomeCartella/NomeVariabile").Value;
-                float[,] punti = raw as float[,];
-
-                var sb = new System.Text.StringBuilder();
-                sb.Append("{\"points\":[");
-                int n = punti != null ? punti.GetLength(0) : 0;
-                for (int i = 0; i < n; i++)
-                {
-                    if (i > 0) sb.Append(',');
-                    sb.Append('[');
-                    sb.Append(punti[i, 0].ToString(System.Globalization.CultureInfo.InvariantCulture));
-                    sb.Append(',');
-                    sb.Append(punti[i, 1].ToString(System.Globalization.CultureInfo.InvariantCulture));
-                    sb.Append(']');
-                }
-                sb.Append("]}");
-
-                var body = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
-                var header = System.Text.Encoding.UTF8.GetBytes(
-                    $"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {body.Length}\r\n\r\n");
-                stream.Write(header, 0, header.Length);
-                stream.Write(body, 0, body.Length);
-                client.Close();
+                var ctx = listener.GetContext();
+                if (ctx.Request.IsWebSocketRequest)
+                    Task.Run(() => HandleWebSocket(ctx));
+                else
+                    ctx.Response.Close();
             }
             catch { }
         }
+    }
+
+    private async Task HandleWebSocket(HttpListenerContext ctx)
+    {
+        var wsCtx = await ctx.AcceptWebSocketAsync(null);
+        var ws = wsCtx.WebSocket;
+
+        while (ws.State == WebSocketState.Open)
+        {
+            try
+            {
+                var tag1 = Project.Current.GetVariable("Model/VariabiliRicetta/nomeFilePunti").Value;
+                var tag2 = Project.Current.GetVariable("Model/VariabiliRicetta/velX").Value;
+
+                object raw = Project.Current.GetVariable("Model/Profilo/xyGraph").Value;
+                float[,] punti = ((UAManagedCore.UAValue)raw).Value as float[,];
+                int n = punti != null ? punti.GetLength(0) : 0;
+                var pts = new string[n];
+                for (int i = 0; i < n; i++)
+                    pts[i] = "[" +
+                        punti[i, 0].ToString(System.Globalization.CultureInfo.InvariantCulture) + "," +
+                        punti[i, 1].ToString(System.Globalization.CultureInfo.InvariantCulture) + "]";
+
+                var json = $"{{\"nomeFilePunti\":\"{tag1}\",\"VelX\":{tag2},\"points\":[{string.Join(",", pts)}]}}";
+                var buf = System.Text.Encoding.UTF8.GetBytes(json);
+                await ws.SendAsync(new ArraySegment<byte>(buf),
+                    WebSocketMessageType.Text, true, CancellationToken.None);
+
+                await Task.Delay(2000);
+            }
+            catch { break; }
+        }
+
+        ws.Dispose();
     }
 }
