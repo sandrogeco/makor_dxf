@@ -1729,7 +1729,8 @@
             ctx.fillText('Asse Y', 0, 0);
             ctx.restore();
 
-            // Disegna limiti orizzontali (linee verticali)
+            // Disegna limiti orizzontali (linee verticali) — solo in modalità normale
+            if (PARAM_MODE !== 'viewer' && PARAM_MODE !== 'opc') {
             const line1ScreenX = transformX(chartState.line1X);
             const line2ScreenX = transformX(chartState.line2X);
 
@@ -1784,6 +1785,7 @@
             const line2Label = 'L2: X=' + chartState.line2X.toFixed(decimalsX) +
                                (line2Y !== null ? ' Y=' + line2Y.toFixed(decimalsY) : '');
             ctx.fillText(line2Label, line2ScreenX + 5, padding + 30);
+            } // fine blocco linee verticali
 
             // Linea orizzontale per offset (se offset ≠ 0)
             if (chartState.offsetY !== 0) {
