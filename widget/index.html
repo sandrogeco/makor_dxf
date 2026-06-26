@@ -570,6 +570,18 @@
                 <span class="info-label" data-i18n="label_range_y">Range Y</span>
                 <span class="info-value" id="rangeY">-</span>
             </div>
+            <div class="info-item">
+                <span class="info-label" data-i18n="label_um">Unità</span>
+                <select id="umSelect" onchange="setUm(this.value)"
+                        style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:12px;padding:2px 4px;">
+                    <option value="">-</option>
+                    <option value="mm">mm</option>
+                    <option value="cm">cm</option>
+                    <option value="m">m</option>
+                    <option value="in">in</option>
+                    <option value="ft">ft</option>
+                </select>
+            </div>
         </div>
     </div>
 
@@ -782,7 +794,9 @@
             axisMinX: 0,
             axisMaxX: 100,
             axisMinY: 0,
-            axisMaxY: 100
+            axisMaxY: 100,
+            um: null,
+            umFromDxf: false
         };
 
         let INTERPOLATION_STEP = 0.005;
@@ -847,6 +861,8 @@
             // Reset offset Y a 0
             chartState.offsetY = 0;
             document.getElementById('offsetYInput').value = 0;
+            chartState.umFromDxf = false;
+            chartState.um = PARAM_UM || null;
 
             console.log('CSV salvato per refresh. lastLoadType:', lastLoadType);
             applyCSVData(csvText);
@@ -1531,6 +1547,12 @@
                 document.getElementById('rangeX').textContent = '-';
                 document.getElementById('rangeY').textContent = '-';
             }
+            const umSelect = document.getElementById('umSelect');
+            if (umSelect) {
+                umSelect.value = chartState.um || '';
+                umSelect.disabled = chartState.umFromDxf;
+                umSelect.title = chartState.umFromDxf ? t('label_um_from_dxf') : '';
+            }
         }
 
         // Funzione per determinare il numero di decimali appropriato in base al range
@@ -1635,17 +1657,18 @@
             const decimalsX = getDecimalPlaces(rangeX);
             const decimalsY = getDecimalPlaces(rangeY);
 
+            const umSuffix = chartState.um ? ' ' + chartState.um : '';
             for (let i = 0; i <= 5; i++) {
                 const screenX = padding + plotWidth * (i / 5);
                 const value = minX + rangeX * (i / 5);
-                ctx.fillText(value.toFixed(decimalsX), screenX, height - padding + 20);
+                ctx.fillText(value.toFixed(decimalsX) + (i === 5 ? umSuffix : ''), screenX, height - padding + 20);
             }
 
             ctx.textAlign = 'right';
             for (let i = 0; i <= 5; i++) {
                 const screenY = height - padding - plotHeight * (i / 5);
                 const value = minY + rangeY * (i / 5);
-                ctx.fillText(value.toFixed(decimalsY), padding - 10, screenY + 4);
+                ctx.fillText(value.toFixed(decimalsY) + (i === 5 ? umSuffix : ''), padding - 10, screenY + 4);
             }
 
             // Transform con scala uguale per X e Y
@@ -1943,6 +1966,26 @@
             reader.readAsText(file);
         }
 
+        // ===== UNITÀ DI MISURA =====
+        const INSUNITS_MAP = { 1:'in', 2:'ft', 4:'mm', 5:'cm', 6:'m', 7:'km', 13:'μm', 14:'dm' };
+
+        function extractInsunits(dxfString) {
+            const lines = dxfString.split('\n').map(l => l.trim());
+            for (let i = 0; i < lines.length - 2; i++) {
+                if (lines[i] === '$INSUNITS') {
+                    const val = parseInt(lines[i + 2]);
+                    return (!isNaN(val) && val > 0) ? (INSUNITS_MAP[val] || null) : null;
+                }
+            }
+            return null;
+        }
+
+        function setUm(val) {
+            chartState.um = val || null;
+            updateUI();
+            drawChart();
+        }
+
         // ===== PARSER DXF NATIVO =====
         function parseDXFNative(dxfString) {
             const lines = dxfString.split('\n').map(l => l.trim());
@@ -2002,9 +2045,13 @@
                 console.log('Passo interpolazione:', INTERPOLATION_STEP);
 
                 const dxf = parseDXFNative(dxfString);
+                const dxfUm = extractInsunits(dxfString);
+                chartState.umFromDxf = !!dxfUm;
+                chartState.um = dxfUm || PARAM_UM || chartState.um;
 
                 console.log('DXF parsato');
                 console.log('Entità trovate:', dxf.entities ? dxf.entities.length : 0);
+                console.log('Unità DXF ($INSUNITS):', dxfUm || 'non specificata');
 
                 if (!dxf || !dxf.entities || dxf.entities.length === 0) {
                     throw new Error(t('err_dxf_invalid'));
@@ -3009,6 +3056,8 @@ label_offset_y,Offset Y,Offset Y
 label_interpolation,Interpolazione,Interpolation
 label_range_x,Range X,Range X
 label_range_y,Range Y,Range Y
+label_um,Unità,Unit
+label_um_from_dxf,Unità rilevata dal file DXF (non modificabile),Unit detected from DXF file (read-only)
 </script>
 
 </body>
