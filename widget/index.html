@@ -300,6 +300,12 @@
             width: 100%;
             padding: 8px 60px;
             box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .range-selector-container .range-selector {
+            flex: 1;
         }
 
         .range-selector {
@@ -429,6 +435,15 @@
             <canvas id="chartCanvas"></canvas>
             <!-- Range Selector sotto il grafico -->
             <div class="range-selector-container">
+                <select id="umSelect" onchange="setUm(this.value)"
+                        style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:12px;padding:2px 4px;flex-shrink:0;">
+                    <option value="">-</option>
+                    <option value="mm">mm</option>
+                    <option value="cm">cm</option>
+                    <option value="m">m</option>
+                    <option value="in">in</option>
+                    <option value="ft">ft</option>
+                </select>
                 <div class="range-selector">
                     <div class="range-track"></div>
                     <div class="range-selection" id="rangeSelection"></div>
@@ -569,18 +584,6 @@
             <div class="info-item">
                 <span class="info-label" data-i18n="label_range_y">Range Y</span>
                 <span class="info-value" id="rangeY">-</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label" data-i18n="label_um">Unità</span>
-                <select id="umSelect" onchange="setUm(this.value)"
-                        style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:12px;padding:2px 4px;">
-                    <option value="">-</option>
-                    <option value="mm">mm</option>
-                    <option value="cm">cm</option>
-                    <option value="m">m</option>
-                    <option value="in">in</option>
-                    <option value="ft">ft</option>
-                </select>
             </div>
         </div>
     </div>
