@@ -733,6 +733,10 @@
                                 PARAM_LINGUA = json.lingua;
                                 applyTranslations();
                             }
+                            if (json.um !== undefined) {
+                                chartState.um = json.um || null;
+                                chartState.umFromDxf = false;
+                            }
                             chartState.data = json.points
                                 .filter(p => !isNaN(p[0]) && !isNaN(p[1]))
                                 .map(p => ({ x: p[0], y: p[1] }));
