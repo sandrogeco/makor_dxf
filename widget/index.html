@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="lingua" content="it">
     <title>XY Chart - DXF CSV Viewer</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -419,7 +420,7 @@
             <h1>XY Chart - DXF Viewer</h1>
             <div class="status-indicator">
                 <div class="status-dot"></div>
-                <span id="connectionStatus">Caricamento...</span>
+                <span id="connectionStatus" data-i18n="status_loading">Caricamento...</span>
             </div>
         </div>
 
@@ -440,108 +441,109 @@
         <div class="controls-panel">
             <!-- Upload DXF & CSV -->
             <div class="control-group">
-                <h3>📊 Dati</h3>
+                <h3 data-i18n="label_data_section">📊 Dati</h3>
                 <div class="file-upload-wrapper">
                     <input type="file" id="dxfFileInput" accept=".dxf" onchange="handleDXFUpload(event)">
-                    <label for="dxfFileInput" class="file-upload-label">
+                    <label for="dxfFileInput" class="file-upload-label" data-i18n="label_load_dxf">
                         📁 Carica File DXF
                     </label>
                 </div>
                 <div class="file-upload-wrapper" style="margin-top: 8px;">
                     <input type="file" id="csvFileInput" accept=".csv" onchange="handleCSVUpload(event)">
-                    <label for="csvFileInput" class="file-upload-label">
+                    <label for="csvFileInput" class="file-upload-label" data-i18n="label_load_csv">
                         📄 Carica File CSV
                     </label>
                 </div>
-                <div class="file-name-display" id="fileName">Nessun file selezionato</div>
+                <div class="file-name-display" id="fileName" data-i18n="label_no_file">Nessun file selezionato</div>
                 <button class="control-btn full-width" onclick="downloadCSV()" style="margin-top: 8px;">
-                    <span>💾 Esporta CSV</span>
+                    <span data-i18n="label_export_csv">💾 Esporta CSV</span>
                 </button>
             </div>
 
             <!-- Offset Parallelo -->
             <div class="control-group">
-                <h3>↔️ Offset Parallelo</h3>
+                <h3 data-i18n="label_offset_section">↔️ Offset Parallelo</h3>
                 <div class="slider-container">
                     <div class="slider-label">
-                        <span>Distanza Offset</span>
+                        <span data-i18n="label_offset_distance">Distanza Offset</span>
                         <span class="slider-value" id="offsetYValue">0</span>
                     </div>
                     <input type="text" inputmode="none" readonly id="offsetYInput" value="0"
-                           onclick="numpadOpen(this, 'Distanza Offset')"
+                           onclick="numpadOpen(this, t('label_offset_distance'))"
                            style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; cursor: pointer;">
                 </div>
                 <button class="control-btn full-width" onclick="applyOffset()" style="margin-top: 8px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));">
-                    <span>Applica Offset</span>
+                    <span data-i18n="label_apply_offset">Applica Offset</span>
                 </button>
                 <div id="debugButtons" style="display: none;">
                     <button class="control-btn full-width" onclick="initOffsetStep()" style="margin-top: 8px; background: #ff9900;">
-                        <span>Init Step</span>
+                        <span data-i18n="label_init_step">Init Step</span>
                     </button>
                     <button class="control-btn full-width" onclick="nextOffsetStep()" style="margin-top: 8px; background: #ff5500;">
-                        <span>Step Avanti</span>
+                        <span data-i18n="label_next_step">Step Avanti</span>
                     </button>
                 </div>
                 <button class="control-btn full-width" onclick="resetOffset()" style="margin-top: 8px;">
-                    <span>Reset</span>
+                    <span data-i18n="label_reset">Reset</span>
                 </button>
             </div>
 
             <!-- Passo Interpolazione -->
             <div class="control-group">
-                <h3>🔧 Passo Interpolazione</h3>
+                <h3 data-i18n="label_interp_section">🔧 Passo Interpolazione</h3>
                 <div class="slider-container">
                     <div class="slider-label">
-                        <span>Precisione</span>
+                        <span data-i18n="label_precision">Precisione</span>
                         <span class="slider-value" id="interpolationValue">0.005</span>
                     </div>
                     <input type="text" inputmode="none" readonly id="interpolationInput" value="0.005"
-                           onclick="numpadOpen(this, 'Passo Interpolazione')"
+                           onclick="numpadOpen(this, t('label_interp_section'))"
                            style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; cursor: pointer;">
                 </div>
 
                 <!-- Modalità Interpolazione -->
                 <div style="margin-top: 12px;">
-                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Modalità:</div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;" data-i18n="label_interp_mode">Modalità:</div>
                     <label style="display: flex; align-items: center; margin-bottom: 4px; cursor: pointer; font-size: 12px;">
                         <input type="radio" name="interpolationMode" value="geometric" checked onchange="setInterpolationMode(this.value)"
                                style="margin-right: 6px;">
-                        <span>Su lunghezza geometrica</span>
+                        <span data-i18n="label_geo_length">Su lunghezza geometrica</span>
                     </label>
                     <label style="display: flex; align-items: center; cursor: pointer; font-size: 12px;">
                         <input type="radio" name="interpolationMode" value="deltaX" onchange="setInterpolationMode(this.value)"
                                style="margin-right: 6px;">
-                        <span>Su delta X (asse orizzontale)</span>
+                        <span data-i18n="label_delta_x">Su delta X (asse orizzontale)</span>
                     </label>
                 </div>
 
                 <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
-                    Punti generati: <span id="generatedPointsCount" style="color: var(--accent-color); font-weight: bold;">0</span>
+                    <span data-i18n="label_points_generated">Punti generati:</span>
+                    <span id="generatedPointsCount" style="color: var(--accent-color); font-weight: bold;">0</span>
                 </div>
             </div>
 
             <!-- Limiti Orizzontali -->
             <div class="control-group">
-                <h3>📏 Limiti Orizzontali</h3>
+                <h3 data-i18n="label_limits_section">📏 Limiti Orizzontali</h3>
                 <div class="slider-container" style="margin-bottom: 8px;">
                     <div class="slider-label">
-                        <span>Limite 1 (X)</span>
+                        <span data-i18n="label_limit1">Limite 1 (X)</span>
                         <span class="slider-value" id="line1Value">0</span>
                     </div>
                     <input type="text" inputmode="none" readonly id="line1Input" value="0"
-                           onclick="numpadOpen(this, 'Limite 1 (X)')"
+                           onclick="numpadOpen(this, t('label_limit1'))"
                            style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; cursor: pointer;">
                 </div>
                 <div class="slider-container">
                     <div class="slider-label">
-                        <span>Limite 2 (X)</span>
+                        <span data-i18n="label_limit2">Limite 2 (X)</span>
                         <span class="slider-value" id="line2Value">100</span>
                     </div>
                     <input type="text" inputmode="none" readonly id="line2Input" value="100"
-                           onclick="numpadOpen(this, 'Limite 2 (X)')"
+                           onclick="numpadOpen(this, t('label_limit2'))"
                            style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; cursor: pointer;">
                 </div>
-                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;" data-i18n="label_drag_hint">
                     Trascina i limiti sul grafico per spostarli
                 </div>
             </div>
@@ -549,23 +551,23 @@
 
         <div class="info-panel">
             <div class="info-item">
-                <span class="info-label">Punti Dati</span>
+                <span class="info-label" data-i18n="label_data_points">Punti Dati</span>
                 <span class="info-value" id="dataPointsCount">0</span>
             </div>
             <div class="info-item">
-                <span class="info-label">Offset Y</span>
+                <span class="info-label" data-i18n="label_offset_y">Offset Y</span>
                 <span class="info-value" id="currentOffsetY">0</span>
             </div>
             <div class="info-item">
-                <span class="info-label">Interpolazione</span>
+                <span class="info-label" data-i18n="label_interpolation">Interpolazione</span>
                 <span class="info-value" id="currentInterpolation">0.005</span>
             </div>
             <div class="info-item">
-                <span class="info-label">Range X</span>
+                <span class="info-label" data-i18n="label_range_x">Range X</span>
                 <span class="info-value" id="rangeX">-</span>
             </div>
             <div class="info-item">
-                <span class="info-label">Range Y</span>
+                <span class="info-label" data-i18n="label_range_y">Range Y</span>
                 <span class="info-value" id="rangeY">-</span>
             </div>
         </div>
@@ -581,8 +583,45 @@
             '4': 'mode',
             '5': 'csv',
             '6': 'debug',
-            '7': 'endpoint'
+            '7': 'endpoint',
+            '8': 'strings'
         };
+
+        let STRINGS = {};
+
+        function t(key) {
+            const lang = PARAM_LINGUA || 'it';
+            return (STRINGS[lang] || STRINGS['it'] || {})[key] || key;
+        }
+
+        function loadStrings() {
+            try {
+                const el = document.getElementById('strings-data');
+                if (!el) { console.warn('strings-data non trovato'); return; }
+                const lines = el.textContent.trim().split(/\r?\n/);
+                if (lines.length < 2) return;
+                const headers = lines[0].split(',').map(h => h.trim());
+                const langs = headers.slice(1);
+                langs.forEach(l => { STRINGS[l] = {}; });
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = lines[i].split(',').map(c => c.trim());
+                    const key = cols[0];
+                    if (!key) continue;
+                    langs.forEach((l, idx) => {
+                        if (cols[idx + 1] !== undefined) STRINGS[l][key] = cols[idx + 1];
+                    });
+                }
+                console.log('Strings caricati:', Object.keys(STRINGS));
+            } catch(e) { console.warn('Errore parsing strings:', e); }
+        }
+
+        function applyTranslations() {
+            if (Object.keys(STRINGS).length === 0) return;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = t(el.dataset.i18n);
+            });
+            document.documentElement.lang = PARAM_LINGUA || 'it';
+        }
 
         // Parametri da URL: supporta sia ?key=val&... che #key=val;...
         function _parseParams() {
@@ -604,19 +643,21 @@
             new URLSearchParams(window.location.search).forEach((v, k) => { map[k] = v; });
             return map;
         }
-        let DEBUG_MODE, PARAM_MODE, PARAM_CSV, PARAM_LARGHEZZA, PARAM_ALTEZZA, PARAM_LINGUA, PARAM_UM, PARAM_ENDPOINT;
+        let DEBUG_MODE, PARAM_MODE, PARAM_CSV, PARAM_LARGHEZZA, PARAM_ALTEZZA, PARAM_LINGUA, PARAM_UM, PARAM_ENDPOINT, PARAM_STRINGS;
         let _opcWs = null;
 
         function applyParams() {
             const p = _parseParams();
+            const metaLingua = document.querySelector('meta[name="lingua"]')?.getAttribute('content');
             DEBUG_MODE      = p['debug']     === 'true';
             PARAM_MODE      = p['mode']      || null;
             PARAM_CSV       = p['csv']       || null;
             PARAM_LARGHEZZA = p['larghezza'] ? parseInt(p['larghezza']) : null;
             PARAM_ALTEZZA   = p['altezza']   ? parseInt(p['altezza'])   : null;
-            PARAM_LINGUA    = p['lingua']    || null;
+            PARAM_LINGUA    = p['lingua']    || metaLingua              || 'it';
             PARAM_UM        = p['um']        || null;
             PARAM_ENDPOINT  = p['endpoint']  || 'ws://localhost:8765/';
+            PARAM_STRINGS   = p['strings']   || '../data/strings.csv';
 
             // Larghezza container
             const container = document.querySelector('.widget-container');
@@ -647,15 +688,15 @@
                 if (rangeContainer) rangeContainer.style.display = 'none';
                 // Auto-carica CSV
                 if (PARAM_CSV) {
-                    document.getElementById('connectionStatus').textContent = 'Caricamento CSV...';
+                    document.getElementById('connectionStatus').textContent = t('status_loading_csv');
                     let csvUrl = PARAM_CSV;
                     if (/^[a-zA-Z]:[\\\/]/.test(csvUrl))
                         csvUrl = 'file:///' + csvUrl.replace(/\\/g, '/');
                     fetch(csvUrl + (csvUrl.startsWith('file') ? '' : '?' + new Date().getTime()))
-                        .then(r => { if (!r.ok) throw new Error('File non trovato'); return r.text(); })
+                        .then(r => { if (!r.ok) throw new Error(t('err_file_not_found')); return r.text(); })
                         .then(text => parseCSV(text))
                         .catch(err => {
-                            document.getElementById('connectionStatus').textContent = 'ERRORE: ' + err.message;
+                            document.getElementById('connectionStatus').textContent = t('status_error') + ': ' + err.message;
                         });
                 }
             } else if (PARAM_MODE === 'opc') {
@@ -670,12 +711,16 @@
                     _opcWs = new WebSocket(PARAM_ENDPOINT);
 
                     _opcWs.onopen = function() {
-                        document.getElementById('connectionStatus').textContent = 'OPC: connesso';
+                        document.getElementById('connectionStatus').textContent = t('status_connected');
                     };
 
                     _opcWs.onmessage = function(e) {
                         try {
                             const json = JSON.parse(e.data);
+                            if (json.lingua && json.lingua !== PARAM_LINGUA) {
+                                PARAM_LINGUA = json.lingua;
+                                applyTranslations();
+                            }
                             chartState.data = json.points
                                 .filter(p => !isNaN(p[0]) && !isNaN(p[1]))
                                 .map(p => ({ x: p[0], y: p[1] }));
@@ -690,15 +735,15 @@
                                 chartState.axisMinY = 0; chartState.axisMaxY = axisMax;
                             }
                             document.getElementById('connectionStatus').textContent =
-                                'OPC: ' + chartState.data.length + ' punti';
+                                `OPC: ${chartState.data.length} ${t('status_points')}`;
                             drawChart();
                         } catch(err) {
-                            document.getElementById('connectionStatus').textContent = 'ERRORE parse: ' + err.message;
+                            document.getElementById('connectionStatus').textContent = t('status_error_parse') + ': ' + err.message;
                         }
                     };
 
                     _opcWs.onerror = function() {
-                        document.getElementById('connectionStatus').textContent = 'OPC: errore connessione';
+                        document.getElementById('connectionStatus').textContent = t('status_error_connection');
                     };
 
                     _opcWs.onclose = function() {
@@ -715,6 +760,7 @@
                 if (rangeContainer) rangeContainer.style.display = '';
                 if (_opcWs) { _opcWs.close(); _opcWs = null; }
             }
+            applyTranslations();
         }
 
         applyParams();
@@ -768,13 +814,13 @@
         // ===== CARICA CSV =====
         function loadCSVData() {
             console.log("Caricamento CSV...");
-            document.getElementById('connectionStatus').textContent = 'Caricamento CSV...';
+            document.getElementById('connectionStatus').textContent = t('status_loading_csv');
 
             // Percorso relativo al CSV nella cartella data
             fetch('../data/output.csv?' + new Date().getTime())  // Cache busting
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error('File CSV non trovato');
+                        throw new Error(t('err_csv_not_found'));
                     }
                     return response.text();
                 })
@@ -783,7 +829,7 @@
                 })
                 .catch(error => {
                     console.error('Errore caricamento CSV:', error);
-                    document.getElementById('connectionStatus').textContent = 'ERRORE: ' + error.message;
+                    document.getElementById('connectionStatus').textContent = t('status_error') + ': ' + error.message;
                     chartState.data = [];
                     updateUI();
                     drawChart();
@@ -864,7 +910,7 @@
                 document.getElementById('line2Input').value = dataMaxX.toFixed(3);
             }
 
-            document.getElementById('connectionStatus').textContent = 'CSV caricato (' + chartState.data.length + ' punti)';
+            document.getElementById('connectionStatus').textContent = `${t('status_csv_loaded')} (${chartState.data.length} ${t('status_points')})`;
 
             updateUI();
             drawChart();
@@ -1818,7 +1864,7 @@
             console.log('File:', file.name);
 
             document.getElementById('fileName').textContent = file.name;
-            document.getElementById('connectionStatus').textContent = 'Caricamento CSV...';
+            document.getElementById('connectionStatus').textContent = t('status_loading_csv');
 
             // Reset completo stato offset
             chartState.offsetY = 0;
@@ -1843,7 +1889,7 @@
                     parseCSV(csvText);
                 } catch (error) {
                     console.error('Errore lettura file CSV:', error);
-                    document.getElementById('connectionStatus').textContent = 'ERRORE: ' + error.message;
+                    document.getElementById('connectionStatus').textContent = t('status_error') + ': ' + error.message;
                 }
             };
             reader.readAsText(file);
@@ -1859,7 +1905,7 @@
             console.log('File:', file.name);
 
             document.getElementById('fileName').textContent = file.name;
-            document.getElementById('connectionStatus').textContent = 'Caricamento DXF...';
+            document.getElementById('connectionStatus').textContent = t('status_loading_dxf');
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -1891,7 +1937,7 @@
                     parseDXF(dxfString, file.name);
                 } catch (error) {
                     console.error('Errore lettura file:', error);
-                    document.getElementById('connectionStatus').textContent = 'ERRORE: ' + error.message;
+                    document.getElementById('connectionStatus').textContent = t('status_error') + ': ' + error.message;
                 }
             };
             reader.readAsText(file);
@@ -1961,7 +2007,7 @@
                 console.log('Entità trovate:', dxf.entities ? dxf.entities.length : 0);
 
                 if (!dxf || !dxf.entities || dxf.entities.length === 0) {
-                    throw new Error('DXF non valido o vuoto');
+                    throw new Error(t('err_dxf_invalid'));
                 }
 
                 // Log dei tipi di entità presenti
@@ -2032,7 +2078,7 @@
                 console.log('Splines:', splineCount, 'Lines:', lineCount, 'Arcs:', arcCount, 'Circles:', circleCount, 'Polylines:', polylineCount, 'Ignorati:', ignoredCount);
 
                 if (xPoints.length === 0) {
-                    const errorMsg = `DXF processato ma nessun punto estratto. Entità trovate: ${dxf.entities.length}. Controllare console per dettagli.`;
+                    const errorMsg = `${t('err_dxf_empty')}. Entità trovate: ${dxf.entities.length}.`;
                     document.getElementById('connectionStatus').textContent = errorMsg;
                     throw new Error(errorMsg);
                 }
@@ -2086,13 +2132,13 @@
                 document.getElementById('line1Input').value = '0';
                 document.getElementById('line2Input').value = maxX.toFixed(3);
 
-                let successMsg = `Caricati ${xPoints.length} punti`;
+                let successMsg = `${t('status_loaded')} ${xPoints.length} ${t('status_points')}`;
                 const parts = [];
-                if (splineCount > 0) parts.push(`${splineCount} splines`);
-                if (lineCount > 0) parts.push(`${lineCount} linee`);
-                if (arcCount > 0) parts.push(`${arcCount} archi`);
-                if (circleCount > 0) parts.push(`${circleCount} cerchi`);
-                if (polylineCount > 0) parts.push(`${polylineCount} polylines`);
+                if (splineCount > 0) parts.push(`${splineCount} ${t('dxf_splines')}`);
+                if (lineCount > 0) parts.push(`${lineCount} ${t('dxf_lines')}`);
+                if (arcCount > 0) parts.push(`${arcCount} ${t('dxf_arcs')}`);
+                if (circleCount > 0) parts.push(`${circleCount} ${t('dxf_circles')}`);
+                if (polylineCount > 0) parts.push(`${polylineCount} ${t('dxf_polylines')}`);
                 if (parts.length > 0) successMsg += ` (${parts.join(', ')})`;
 
                 document.getElementById('connectionStatus').textContent = successMsg;
@@ -2110,7 +2156,7 @@
 
             } catch (error) {
                 console.error('Errore parsing DXF:', error);
-                document.getElementById('connectionStatus').textContent = 'ERRORE: ' + error.message;
+                document.getElementById('connectionStatus').textContent = t('status_error') + ': ' + error.message;
                 chartState.data = [];
                 updateUI();
                 drawChart();
@@ -2613,7 +2659,7 @@
                 }
 
                 console.log('CSV scaricato: ' + allPoints.length + ' punti (X crescente)');
-                document.getElementById('connectionStatus').textContent = 'CSV esportato (' + allPoints.length + ' punti)';
+                document.getElementById('connectionStatus').textContent = `${t('status_csv_exported')} (${allPoints.length} ${t('status_points')})`;
             } catch (error) {
                 console.error('Errore export CSV:', error);
                 alert('Errore durante l\'esportazione del CSV: ' + error.message);
@@ -2798,6 +2844,9 @@
             console.log('DEBUG_MODE:', DEBUG_MODE, '(usa ?debug=true per attivare)');
             updateRangeSelector();
 
+            loadStrings();
+            applyTranslations();
+
             // Mostra bottoni debug se DEBUG_MODE
             if (DEBUG_MODE) {
                 document.getElementById('debugButtons').style.display = 'block';
@@ -2911,5 +2960,56 @@
             </div>
         </div>
     </div>
+
+<script type="text/plain" id="strings-data">
+key,it,en
+status_loading,Caricamento...,Loading...
+status_loading_csv,Caricamento CSV...,Loading CSV...
+status_loading_dxf,Caricamento DXF...,Loading DXF...
+status_connected,OPC: connesso,OPC: connected
+status_error_connection,OPC: errore connessione,OPC: connection error
+status_error_parse,ERRORE parse,Parse error
+status_error,ERRORE,ERROR
+status_points,punti,points
+status_csv_loaded,CSV caricato,CSV loaded
+status_csv_exported,CSV esportato,CSV exported
+status_loaded,Caricati,Loaded
+err_file_not_found,File non trovato,File not found
+err_csv_not_found,File CSV non trovato,CSV file not found
+err_dxf_invalid,DXF non valido o vuoto,Invalid or empty DXF
+err_dxf_empty,DXF processato ma nessun punto estratto,DXF processed but no points extracted
+dxf_splines,splines,splines
+dxf_lines,linee,lines
+dxf_arcs,archi,arcs
+dxf_circles,cerchi,circles
+dxf_polylines,polylines,polylines
+label_data_section,📊 Dati,📊 Data
+label_load_dxf,📁 Carica File DXF,📁 Load DXF File
+label_load_csv,📄 Carica File CSV,📄 Load CSV File
+label_no_file,Nessun file selezionato,No file selected
+label_export_csv,💾 Esporta CSV,💾 Export CSV
+label_offset_section,↔️ Offset Parallelo,↔️ Parallel Offset
+label_offset_distance,Distanza Offset,Offset Distance
+label_apply_offset,Applica Offset,Apply Offset
+label_init_step,Init Step,Init Step
+label_next_step,Step Avanti,Next Step
+label_reset,Reset,Reset
+label_interp_section,🔧 Passo Interpolazione,🔧 Interpolation Step
+label_precision,Precisione,Precision
+label_interp_mode,Modalità:,Mode:
+label_geo_length,Su lunghezza geometrica,By geometric length
+label_delta_x,Su delta X (asse orizzontale),By delta X (horizontal axis)
+label_points_generated,Punti generati:,Generated points:
+label_limits_section,📏 Limiti Orizzontali,📏 Horizontal Limits
+label_limit1,Limite 1 (X),Limit 1 (X)
+label_limit2,Limite 2 (X),Limit 2 (X)
+label_drag_hint,Trascina i limiti sul grafico per spostarli,Drag limits on chart to move them
+label_data_points,Punti Dati,Data Points
+label_offset_y,Offset Y,Offset Y
+label_interpolation,Interpolazione,Interpolation
+label_range_x,Range X,Range X
+label_range_y,Range Y,Range Y
+</script>
+
 </body>
 </html>

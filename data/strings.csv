@@ -1,0 +1,47 @@
+key,it,en
+status_loading,Caricamento...,Loading...
+status_loading_csv,Caricamento CSV...,Loading CSV...
+status_loading_dxf,Caricamento DXF...,Loading DXF...
+status_connected,OPC: connesso,OPC: connected
+status_error_connection,OPC: errore connessione,OPC: connection error
+status_error_parse,ERRORE parse,Parse error
+status_error,ERRORE,ERROR
+status_points,punti,points
+status_csv_loaded,CSV caricato,CSV loaded
+status_csv_exported,CSV esportato,CSV exported
+status_loaded,Caricati,Loaded
+err_file_not_found,File non trovato,File not found
+err_csv_not_found,File CSV non trovato,CSV file not found
+err_dxf_invalid,DXF non valido o vuoto,Invalid or empty DXF
+err_dxf_empty,DXF processato ma nessun punto estratto,DXF processed but no points extracted
+dxf_splines,splines,splines
+dxf_lines,linee,lines
+dxf_arcs,archi,arcs
+dxf_circles,cerchi,circles
+dxf_polylines,polylines,polylines
+label_data_section,📊 Dati,📊 Data
+label_load_dxf,📁 Carica File DXF,📁 Load DXF File
+label_load_csv,📄 Carica File CSV,📄 Load CSV File
+label_no_file,Nessun file selezionato,No file selected
+label_export_csv,💾 Esporta CSV,💾 Export CSV
+label_offset_section,↔️ Offset Parallelo,↔️ Parallel Offset
+label_offset_distance,Distanza Offset,Offset Distance
+label_apply_offset,Applica Offset,Apply Offset
+label_init_step,Init Step,Init Step
+label_next_step,Step Avanti,Next Step
+label_reset,Reset,Reset
+label_interp_section,🔧 Passo Interpolazione,🔧 Interpolation Step
+label_precision,Precisione,Precision
+label_interp_mode,Modalità:,Mode:
+label_geo_length,Su lunghezza geometrica,By geometric length
+label_delta_x,Su delta X (asse orizzontale),By delta X (horizontal axis)
+label_points_generated,Punti generati:,Generated points:
+label_limits_section,📏 Limiti Orizzontali,📏 Horizontal Limits
+label_limit1,Limite 1 (X),Limit 1 (X)
+label_limit2,Limite 2 (X),Limit 2 (X)
+label_drag_hint,Trascina i limiti sul grafico per spostarli,Drag limits on chart to move them
+label_data_points,Punti Dati,Data Points
+label_offset_y,Offset Y,Offset Y
+label_interpolation,Interpolazione,Interpolation
+label_range_x,Range X,Range X
+label_range_y,Range Y,Range Y
