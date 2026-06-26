@@ -470,9 +470,20 @@
                     </label>
                 </div>
                 <div class="file-name-display" id="fileName" data-i18n="label_no_file">Nessun file selezionato</div>
-                <button class="control-btn full-width" onclick="downloadCSV()" style="margin-top: 8px;">
-                    <span data-i18n="label_export_csv">💾 Esporta CSV</span>
-                </button>
+                <div style="display:flex;gap:6px;margin-top:8px;align-items:center;">
+                    <button class="control-btn" style="flex:1;" onclick="downloadCSV()">
+                        <span data-i18n="label_export_csv">💾 Esporta CSV</span>
+                    </button>
+                    <select id="exportUmSelect"
+                            style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 4px;flex-shrink:0;">
+                        <option value="">-</option>
+                        <option value="mm">mm</option>
+                        <option value="cm">cm</option>
+                        <option value="m">m</option>
+                        <option value="in">in</option>
+                        <option value="ft">ft</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Offset Parallelo -->
@@ -1975,6 +1986,13 @@
 
         // ===== UNITÀ DI MISURA =====
         const INSUNITS_MAP = { 1:'in', 2:'ft', 4:'mm', 5:'cm', 6:'m', 7:'km', 13:'μm', 14:'dm' };
+        const MM_PER_UNIT  = { mm:1, cm:10, m:1000, 'in':25.4, ft:304.8, μm:0.001, dm:100, km:1e6 };
+
+        function convertUnit(value, fromUm, toUm) {
+            if (!fromUm || !toUm || fromUm === toUm) return value;
+            const from = MM_PER_UNIT[fromUm], to = MM_PER_UNIT[toUm];
+            return (from && to) ? value * from / to : value;
+        }
 
         function extractInsunits(dxfString) {
             const lines = dxfString.split('\n').map(l => l.trim());
@@ -2668,10 +2686,19 @@
                     return;
                 }
 
-                // Crea CSV con solo X,Y
-                let csv = 'X,Y\n';
+                // Conversione unità
+                const exportUm  = document.getElementById('exportUmSelect')?.value || null;
+                const sourceUm  = chartState.um;
+                const canConvert = exportUm && sourceUm && MM_PER_UNIT[sourceUm] && MM_PER_UNIT[exportUm];
+                if (exportUm && !sourceUm) console.warn('Unità sorgente non definita — esporto senza conversione');
+
+                const xHeader = exportUm ? `x_${exportUm}` : 'X';
+                const yHeader = exportUm ? `y_${exportUm}` : 'Y';
+                let csv = `${xHeader},${yHeader}\n`;
                 allPoints.forEach(point => {
-                    csv += point.x.toFixed(6) + ',' + point.y.toFixed(6) + '\n';
+                    const x = canConvert ? convertUnit(point.x, sourceUm, exportUm) : point.x;
+                    const y = canConvert ? convertUnit(point.y, sourceUm, exportUm) : point.y;
+                    csv += x.toFixed(6) + ',' + y.toFixed(6) + '\n';
                 });
 
                 // Chiedi nome file all'utente
@@ -3065,6 +3092,7 @@ label_range_x,Range X,Range X
 label_range_y,Range Y,Range Y
 label_um,Unità,Unit
 label_um_from_dxf,Unità rilevata dal file DXF (non modificabile),Unit detected from DXF file (read-only)
+label_export_um,Unità esportazione,Export unit
 </script>
 
 </body>
