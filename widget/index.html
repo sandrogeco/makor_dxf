@@ -1599,8 +1599,8 @@
                 ctx.fillStyle = '#666666';
                 ctx.font = '16px Barlow';
                 ctx.textAlign = 'center';
-                ctx.fillText('Nessun dato disponibile.', width / 2, height / 2 - 10);
-                ctx.fillText('Carica un file DXF o CSV', width / 2, height / 2 + 15);
+                ctx.fillText(t('canvas_no_data'), width / 2, height / 2 - 10);
+                ctx.fillText(t('canvas_load_hint'), width / 2, height / 2 + 15);
                 return;
             }
 
@@ -1808,12 +1808,12 @@
             ctx.fillStyle = '#1a1a1a';
             ctx.font = '14px Barlow';
             ctx.textAlign = 'center';
-            ctx.fillText('Asse X', width / 2, height - 10);
+            ctx.fillText(t('canvas_axis_x'), width / 2, height - 10);
 
             ctx.save();
             ctx.translate(20, height / 2);
             ctx.rotate(-Math.PI / 2);
-            ctx.fillText('Asse Y', 0, 0);
+            ctx.fillText(t('canvas_axis_y'), 0, 0);
             ctx.restore();
 
             // Disegna limiti orizzontali (linee verticali) — solo in modalità normale
@@ -2639,7 +2639,7 @@
 
         async function downloadCSV() {
             if (chartState.data.length === 0) {
-                alert('Nessun dato disponibile. Carica prima un file DXF.');
+                alert(t('canvas_no_data'));
                 return;
             }
 
@@ -3093,6 +3093,10 @@ label_range_y,Range Y,Range Y
 label_um,Unità,Unit
 label_um_from_dxf,Unità rilevata dal file DXF (non modificabile),Unit detected from DXF file (read-only)
 label_export_um,Unità esportazione,Export unit
+canvas_no_data,Nessun dato disponibile.,No data available.
+canvas_load_hint,Carica un file DXF o CSV,Load a DXF or CSV file
+canvas_axis_x,Asse X,X Axis
+canvas_axis_y,Asse Y,Y Axis
 </script>
 
 </body>
