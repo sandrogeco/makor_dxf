@@ -697,7 +697,7 @@
             const infoPanel      = document.querySelector('.info-panel');
             const rangeContainer = document.querySelector('.range-selector-container');
             const header         = document.querySelector('.header');
-            if (PARAM_MODE === 'viewer' || PARAM_MODE === 'opc') {
+            if (PARAM_MODE === 'viewer') {
                 // Layout full-canvas 870x410 senza margini
                 document.body.style.cssText = 'margin:0;padding:0;overflow:hidden';
                 if (container) {
@@ -707,90 +707,71 @@
                 if (chartArea) chartArea.style.cssText = 'padding:0;margin:0;border:none;border-radius:0;height:410px';
                 document.getElementById('chartCanvas').style.height = '410px';
                 if (header)         header.style.display         = 'none';
-            }
-            if (PARAM_MODE === 'viewer') {
                 if (controlsPanel)  controlsPanel.style.display  = 'none';
                 if (infoPanel)      infoPanel.style.display      = 'none';
                 if (rangeContainer) rangeContainer.style.display = 'none';
-                // Auto-carica CSV
-                if (PARAM_CSV) {
-                    document.getElementById('connectionStatus').textContent = t('status_loading_csv');
-                    let csvUrl = PARAM_CSV;
-                    if (/^[a-zA-Z]:[\\\/]/.test(csvUrl))
-                        csvUrl = 'file:///' + csvUrl.replace(/\\/g, '/');
-                    fetch(csvUrl + (csvUrl.startsWith('file') ? '' : '?' + new Date().getTime()))
-                        .then(r => { if (!r.ok) throw new Error(t('err_file_not_found')); return r.text(); })
-                        .then(text => parseCSV(text))
-                        .catch(err => {
-                            document.getElementById('connectionStatus').textContent = t('status_error') + ': ' + err.message;
-                        });
-                }
-            } else if (PARAM_MODE === 'opc') {
-                if (controlsPanel)  controlsPanel.style.display  = 'none';
-                if (infoPanel)      infoPanel.style.display      = 'none';
-                if (rangeContainer) rangeContainer.style.display = 'none';
-
-                // Chiudi WebSocket precedente se esiste
-                if (_opcWs) { _opcWs.close(); _opcWs = null; }
-
-                function connectOpcWs() {
-                    _opcWs = new WebSocket(PARAM_ENDPOINT);
-
-                    _opcWs.onopen = function() {
-                        document.getElementById('connectionStatus').textContent = t('status_connected');
-                    };
-
-                    _opcWs.onmessage = function(e) {
-                        try {
-                            const json = JSON.parse(e.data);
-                            if (json.lingua && json.lingua !== PARAM_LINGUA) {
-                                PARAM_LINGUA = json.lingua;
-                                applyTranslations();
-                            }
-                            if (json.um !== undefined) {
-                                chartState.um = json.um || null;
-                                chartState.umFromDxf = false;
-                            }
-                            chartState.data = json.points
-                                .filter(p => !isNaN(p[0]) && !isNaN(p[1]))
-                                .map(p => ({ x: p[0], y: p[1] }));
-                            chartState.segments = [];
-                            chartState.offsetPolyline = [];
-                            chartState.offsetSurvivors = [];
-                            if (chartState.data.length > 0) {
-                                const xs = chartState.data.map(p => p.x);
-                                const ys = chartState.data.map(p => p.y);
-                                const axisMax = Math.max(...xs, ...ys);
-                                chartState.axisMinX = 0; chartState.axisMaxX = axisMax;
-                                chartState.axisMinY = 0; chartState.axisMaxY = axisMax;
-                            }
-                            document.getElementById('connectionStatus').textContent =
-                                `OPC: ${chartState.data.length} ${t('status_points')}`;
-                            drawChart();
-                        } catch(err) {
-                            document.getElementById('connectionStatus').textContent = t('status_error_parse') + ': ' + err.message;
-                        }
-                    };
-
-                    _opcWs.onerror = function() {
-                        document.getElementById('connectionStatus').textContent = t('status_error_connection');
-                    };
-
-                    _opcWs.onclose = function() {
-                        // Riconnette dopo 2s se ancora in modalità opc
-                        if (PARAM_MODE === 'opc') setTimeout(connectOpcWs, 2000);
-                    };
-                }
-
-                connectOpcWs();
-
             } else {
                 if (controlsPanel)  controlsPanel.style.display  = '';
                 if (infoPanel)      infoPanel.style.display      = '';
                 if (rangeContainer) rangeContainer.style.display = '';
-                if (_opcWs) { _opcWs.close(); _opcWs = null; }
             }
+
+            // WebSocket sempre attiva
+            if (!_opcWs) connectOpcWs();
+
             applyTranslations();
+        }
+
+        function connectOpcWs() {
+            _opcWs = new WebSocket(PARAM_ENDPOINT);
+
+            _opcWs.onopen = function() {
+                document.getElementById('connectionStatus').textContent = t('status_connected');
+            };
+
+            _opcWs.onmessage = function(e) {
+                try {
+                    const json = JSON.parse(e.data);
+                    if (json.lingua && json.lingua !== PARAM_LINGUA) {
+                        PARAM_LINGUA = json.lingua;
+                        applyTranslations();
+                    }
+                    if (json.um !== undefined) {
+                        chartState.um = json.um || null;
+                        chartState.umFromDxf = false;
+                        updateUI();
+                    }
+                    if (PARAM_MODE === 'viewer' && json.points) {
+                        chartState.data = json.points
+                            .filter(p => !isNaN(p[0]) && !isNaN(p[1]))
+                            .map(p => ({ x: p[0], y: p[1] }));
+                        chartState.segments = [];
+                        chartState.offsetPolyline = [];
+                        chartState.offsetSurvivors = [];
+                        if (chartState.data.length > 0) {
+                            const xs = chartState.data.map(p => p.x);
+                            const ys = chartState.data.map(p => p.y);
+                            const axisMax = Math.max(...xs, ...ys);
+                            chartState.axisMinX = 0; chartState.axisMaxX = axisMax;
+                            chartState.axisMinY = 0; chartState.axisMaxY = axisMax;
+                        }
+                        document.getElementById('connectionStatus').textContent =
+                            `WS: ${chartState.data.length} ${t('status_points')}`;
+                        drawChart();
+                    }
+                } catch(err) {
+                    document.getElementById('connectionStatus').textContent = t('status_error_parse') + ': ' + err.message;
+                }
+            };
+
+            _opcWs.onerror = function() {
+                document.getElementById('connectionStatus').textContent = t('status_error_connection');
+            };
+
+            _opcWs.onclose = function() {
+                _opcWs = null;
+                setTimeout(connectOpcWs, 2000);
+            };
         }
 
         applyParams();
@@ -1817,7 +1798,7 @@
             ctx.restore();
 
             // Disegna limiti orizzontali (linee verticali) — solo in modalità normale
-            if (PARAM_MODE !== 'viewer' && PARAM_MODE !== 'opc') {
+            if (PARAM_MODE !== 'viewer') {
             const line1ScreenX = transformX(chartState.line1X);
             const line2ScreenX = transformX(chartState.line2X);
 
@@ -3047,8 +3028,8 @@ key,it,en
 status_loading,Caricamento...,Loading...
 status_loading_csv,Caricamento CSV...,Loading CSV...
 status_loading_dxf,Caricamento DXF...,Loading DXF...
-status_connected,OPC: connesso,OPC: connected
-status_error_connection,OPC: errore connessione,OPC: connection error
+status_connected,WS: connesso,WS: connected
+status_error_connection,WS: errore connessione,WS: connection error
 status_error_parse,ERRORE parse,Parse error
 status_error,ERRORE,ERROR
 status_points,punti,points
