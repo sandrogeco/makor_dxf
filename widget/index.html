@@ -2626,6 +2626,7 @@
 
             const exportBtn = document.querySelector('#exportBtn span');
             if (exportBtn) { exportBtn.textContent = t('label_exporting'); }
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
             try {
                 // Determina range X dei limiti orizzontali
