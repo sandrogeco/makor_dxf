@@ -459,13 +459,13 @@
                 <h3 data-i18n="label_data_section">📊 Dati</h3>
                 <div class="file-upload-wrapper">
                     <input type="file" id="dxfFileInput" accept=".dxf" onchange="handleDXFUpload(event)">
-                    <label for="dxfFileInput" class="file-upload-label" data-i18n="label_load_dxf">
+                    <label for="dxfFileInput" id="dxfImportLabel" class="file-upload-label" data-i18n="label_load_dxf">
                         📁 Carica File DXF
                     </label>
                 </div>
                 <div class="file-upload-wrapper" style="margin-top: 8px;">
                     <input type="file" id="csvFileInput" accept=".csv" onchange="handleCSVUpload(event)">
-                    <label for="csvFileInput" class="file-upload-label" data-i18n="label_load_csv">
+                    <label for="csvFileInput" id="csvImportLabel" class="file-upload-label" data-i18n="label_load_csv">
                         📄 Carica File CSV
                     </label>
                 </div>
@@ -1882,6 +1882,9 @@
             const file = event.target.files[0];
             if (!file) return;
 
+            const csvLabel = document.getElementById('csvImportLabel');
+            if (csvLabel) csvLabel.textContent = t('label_importing');
+
             console.log('=== CARICAMENTO NUOVO CSV DA FILE ===');
             console.log('File:', file.name);
 
@@ -1906,13 +1909,17 @@
 
             const reader = new FileReader();
             reader.onload = function(e) {
-                try {
-                    const csvText = e.target.result;
-                    parseCSV(csvText);
-                } catch (error) {
-                    console.error('Errore lettura file CSV:', error);
-                    document.getElementById('connectionStatus').textContent = t('status_error') + ': ' + error.message;
-                }
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    try {
+                        const csvText = e.target.result;
+                        parseCSV(csvText);
+                    } catch (error) {
+                        console.error('Errore lettura file CSV:', error);
+                        document.getElementById('connectionStatus').textContent = t('status_error') + ': ' + error.message;
+                    } finally {
+                        if (csvLabel) csvLabel.textContent = t('label_load_csv');
+                    }
+                }));
             };
             reader.readAsText(file);
         }
@@ -1923,6 +1930,9 @@
             const file = event.target.files[0];
             if (!file) return;
 
+            const dxfLabel = document.getElementById('dxfImportLabel');
+            if (dxfLabel) dxfLabel.textContent = t('label_importing');
+
             console.log('=== CARICAMENTO NUOVO DXF ===');
             console.log('File:', file.name);
 
@@ -1931,6 +1941,7 @@
 
             const reader = new FileReader();
             reader.onload = function(e) {
+                requestAnimationFrame(() => requestAnimationFrame(() => {
                 try {
                     const dxfString = e.target.result;
                     // Salva per refresh automatico e resetta CSV
@@ -1960,7 +1971,10 @@
                 } catch (error) {
                     console.error('Errore lettura file:', error);
                     document.getElementById('connectionStatus').textContent = t('status_error') + ': ' + error.message;
+                } finally {
+                    if (dxfLabel) dxfLabel.textContent = t('label_load_dxf');
                 }
+                }));
             };
             reader.readAsText(file);
         }
@@ -3057,6 +3071,7 @@ label_load_csv,📄 Carica File CSV,📄 Load CSV File
 label_no_file,Nessun file selezionato,No file selected
 label_export_csv,💾 Esporta CSV,💾 Export CSV
 label_exporting,⏳ Esportazione in corso...,⏳ Exporting...
+label_importing,⏳ Caricamento in corso...,⏳ Loading...
 label_offset_section,↔️ Offset Parallelo,↔️ Parallel Offset
 label_offset_distance,Distanza Offset,Offset Distance
 label_apply_offset,Applica Offset,Apply Offset
