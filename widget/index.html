@@ -471,7 +471,7 @@
                 </div>
                 <div class="file-name-display" id="fileName" data-i18n="label_no_file">Nessun file selezionato</div>
                 <div style="display:flex;gap:6px;margin-top:8px;align-items:center;">
-                    <button class="control-btn" style="flex:1;" onclick="downloadCSV()">
+                    <button id="exportBtn" class="control-btn" style="flex:1;" onclick="downloadCSV()">
                         <span data-i18n="label_export_csv">💾 Esporta CSV</span>
                     </button>
                     <select id="exportUmSelect"
@@ -2624,6 +2624,9 @@
                 return;
             }
 
+            const exportBtn = document.querySelector('#exportBtn span');
+            if (exportBtn) { exportBtn.textContent = t('label_exporting'); }
+
             try {
                 // Determina range X dei limiti orizzontali
                 const minLimitX = Math.min(chartState.line1X, chartState.line2X);
@@ -2725,6 +2728,8 @@
             } catch (error) {
                 console.error('Errore export CSV:', error);
                 alert('Errore durante l\'esportazione del CSV: ' + error.message);
+            } finally {
+                if (exportBtn) { exportBtn.textContent = t('label_export_csv'); }
             }
         }
 
@@ -3050,6 +3055,7 @@ label_load_dxf,📁 Carica File DXF,📁 Load DXF File
 label_load_csv,📄 Carica File CSV,📄 Load CSV File
 label_no_file,Nessun file selezionato,No file selected
 label_export_csv,💾 Esporta CSV,💾 Export CSV
+label_exporting,⏳ Esportazione in corso...,⏳ Exporting...
 label_offset_section,↔️ Offset Parallelo,↔️ Parallel Offset
 label_offset_distance,Distanza Offset,Offset Distance
 label_apply_offset,Applica Offset,Apply Offset
