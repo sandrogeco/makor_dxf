@@ -751,9 +751,8 @@
                         if (chartState.data.length > 0) {
                             const xs = chartState.data.map(p => p.x);
                             const ys = chartState.data.map(p => p.y);
-                            const axisMax = Math.max(...xs, ...ys);
-                            chartState.axisMinX = 0; chartState.axisMaxX = axisMax;
-                            chartState.axisMinY = 0; chartState.axisMaxY = axisMax;
+                            chartState.axisMinX = 0; chartState.axisMaxX = Math.max(...xs);
+                            chartState.axisMinY = 0; chartState.axisMaxY = Math.max(...ys);
                         }
                         document.getElementById('connectionStatus').textContent =
                             `WS: ${chartState.data.length} ${t('status_points')}`;
@@ -911,12 +910,10 @@
                 const dataMaxX = Math.max(...chartState.data.map(p => p.x));
                 const dataMaxY = Math.max(...chartState.data.map(p => p.y));
 
-                // Limiti assi: min = 0, max = max(xmax, ymax)
-                const axisMax = Math.max(dataMaxX, dataMaxY);
                 chartState.axisMinX = 0;
-                chartState.axisMaxX = axisMax;
+                chartState.axisMaxX = dataMaxX;
                 chartState.axisMinY = 0;
-                chartState.axisMaxY = axisMax;
+                chartState.axisMaxY = dataMaxY;
 
                 // Linee verticali ai limiti dati
                 chartState.line1X = 0;
@@ -1618,18 +1615,24 @@
                 y: p.y + chartState.offsetY
             }));
 
-            // Grid
+            // Transform con scala uguale per X e Y
+            const transformX = (x) => padding + (x - minX) * scale;
+            const transformY = (y) => height - padding - (y - minY) * scale;
+
+            // Grid — allineata all'estensione reale dei dati
+            const dataExtentX = rangeX * scale;
+            const dataExtentY = rangeY * scale;
+
             ctx.strokeStyle = '#e0e0e0';
             ctx.lineWidth = 1;
-
             for (let i = 0; i <= 10; i++) {
-                const x = padding + (width - 2 * padding) * (i / 10);
+                const x = padding + dataExtentX * (i / 10);
                 ctx.beginPath();
                 ctx.moveTo(x, padding);
                 ctx.lineTo(x, height - padding);
                 ctx.stroke();
 
-                const y = padding + (height - 2 * padding) * (i / 10);
+                const y = (height - padding) - dataExtentY * (i / 10);
                 ctx.beginPath();
                 ctx.moveTo(padding, y);
                 ctx.lineTo(width - padding, y);
@@ -1648,7 +1651,7 @@
             ctx.lineTo(padding, height - padding);
             ctx.stroke();
 
-            // Labels
+            // Labels — posizioni basate su scale reale, non su plotWidth/plotHeight
             ctx.fillStyle = '#666666';
             ctx.font = '12px JetBrains Mono';
             ctx.textAlign = 'center';
@@ -1658,21 +1661,17 @@
 
             const umSuffix = chartState.um ? ' ' + chartState.um : '';
             for (let i = 0; i <= 5; i++) {
-                const screenX = padding + plotWidth * (i / 5);
                 const value = minX + rangeX * (i / 5);
+                const screenX = transformX(value);
                 ctx.fillText(value.toFixed(decimalsX) + (i === 5 ? umSuffix : ''), screenX, height - padding + 20);
             }
 
             ctx.textAlign = 'right';
             for (let i = 0; i <= 5; i++) {
-                const screenY = height - padding - plotHeight * (i / 5);
                 const value = minY + rangeY * (i / 5);
+                const screenY = transformY(value);
                 ctx.fillText(value.toFixed(decimalsY) + (i === 5 ? umSuffix : ''), padding - 10, screenY + 4);
             }
-
-            // Transform con scala uguale per X e Y
-            const transformX = (x) => padding + (x - minX) * scale;
-            const transformY = (y) => height - padding - (y - minY) * scale;
 
             // Line - disegna segmenti separati se disponibili
             ctx.strokeStyle = '#e07828';
@@ -2186,12 +2185,10 @@
                 const maxX = Math.max(...xPoints);
                 const maxY = Math.max(...yPoints);
 
-                // Limiti assi: min = 0, max = max(xmax, ymax)
-                const axisMax = Math.max(maxX, maxY);
                 chartState.axisMinX = 0;
-                chartState.axisMaxX = axisMax;
+                chartState.axisMaxX = maxX;
                 chartState.axisMinY = 0;
-                chartState.axisMaxY = axisMax;
+                chartState.axisMaxY = maxY;
 
                 // Inizializza linee verticali ai limiti dati
                 chartState.line1X = 0;
