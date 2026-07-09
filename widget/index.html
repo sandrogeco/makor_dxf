@@ -2664,11 +2664,14 @@
                 const canConvert = exportUm && sourceUm && MM_PER_UNIT[sourceUm] && MM_PER_UNIT[exportUm];
                 if (exportUm && !sourceUm) console.warn('Unità sorgente non definita — esporto senza conversione');
 
+                // Offset X: il primo punto parte da 0
+                const xOffset = allPoints[0].x;
+
                 const xHeader = exportUm ? `x_${exportUm}` : 'X';
                 const yHeader = exportUm ? `y_${exportUm}` : 'Y';
                 let csv = `${xHeader},${yHeader}\n`;
                 allPoints.forEach(point => {
-                    const x = canConvert ? convertUnit(point.x, sourceUm, exportUm) : point.x;
+                    const x = canConvert ? convertUnit(point.x - xOffset, sourceUm, exportUm) : point.x - xOffset;
                     const y = canConvert ? convertUnit(point.y, sourceUm, exportUm) : point.y;
                     csv += x.toFixed(6) + ',' + y.toFixed(6) + '\n';
                 });
