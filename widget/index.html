@@ -698,14 +698,14 @@
             const rangeContainer = document.querySelector('.range-selector-container');
             const header         = document.querySelector('.header');
             if (PARAM_MODE === 'viewer') {
-                // Layout full-canvas 870x410 senza margini
+                // Layout full-canvas 890x440 senza margini
                 document.body.style.cssText = 'margin:0;padding:0;overflow:hidden';
                 if (container) {
-                    container.style.cssText = 'width:870px;height:410px;padding:0;margin:0;border:none;border-radius:0;box-shadow:none;overflow:hidden';
+                    container.style.cssText = 'width:890px;height:440px;padding:0;margin:0;border:none;border-radius:0;box-shadow:none;overflow:hidden';
                 }
                 const chartArea = document.querySelector('.chart-area');
-                if (chartArea) chartArea.style.cssText = 'padding:0;margin:0;border:none;border-radius:0;height:410px';
-                document.getElementById('chartCanvas').style.height = '410px';
+                if (chartArea) chartArea.style.cssText = 'padding:0;margin:0;border:none;border-radius:0;height:440px';
+                document.getElementById('chartCanvas').style.height = '440px';
                 if (header)         header.style.display         = 'none';
                 if (controlsPanel)  controlsPanel.style.display  = 'none';
                 if (infoPanel)      infoPanel.style.display      = 'none';
