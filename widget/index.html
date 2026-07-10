@@ -1184,15 +1184,35 @@
                 console.log(`  [${idx}]: (${s.xi.toFixed(4)}, ${s.yi.toFixed(4)}) -> (${s.xf.toFixed(4)}, ${s.yf.toFixed(4)})`);
             });
 
+            const _xMin = chartState.axisMinX;
+            const _xMax = chartState.axisMaxX;
+
+            // Clip in-place tutti i survivor a [xMin, xMax] (evita segmenti che tornano indietro)
+            survivors.forEach(s => {
+                if (s.m !== Infinity) {
+                    if (s.xf > _xMax) { s.xf = _xMax; s.yf = s.m * _xMax + s.q; }
+                    if (s.xi < _xMin) { s.xi = _xMin; s.yi = s.m * _xMin + s.q; }
+                }
+            });
+
+            // Filtra segmenti degeneri (xi >= xf) solo per display
+            const _disp = survivors.filter(s => s.xi < s.xf - 1e-10);
+
+            // Estendi primo a xMin e ultimo a xMax
+            if (_disp.length > 0) {
+                const s0 = _disp[0];
+                if (s0.m !== Infinity) { s0.xi = _xMin; s0.yi = s0.m * _xMin + s0.q; }
+                const sN = _disp[_disp.length - 1];
+                if (sN.m !== Infinity) { sN.xf = _xMax; sN.yf = sN.m * _xMax + sN.q; }
+            }
+
             // Aggiorna visualizzazione
-            chartState.offsetSurvivors = [...survivors];
+            chartState.offsetSurvivors = _disp;
 
             // Costruisci polilinea
             chartState.offsetPolyline = [];
-            survivors.forEach((s, idx) => {
-                if (idx === 0) {
-                    chartState.offsetPolyline.push({ x: s.xi, y: s.yi });
-                }
+            _disp.forEach((s, idx) => {
+                if (idx === 0) chartState.offsetPolyline.push({ x: s.xi, y: s.yi });
                 chartState.offsetPolyline.push({ x: s.xf, y: s.yf });
             });
 
@@ -1455,9 +1475,26 @@
                 console.log(`  ${i}: (${s.xi.toFixed(4)}, ${s.yi.toFixed(4)}) -> (${s.xf.toFixed(4)}, ${s.yf.toFixed(4)})`);
             });
 
+            // Clip tutti i survivor a [minX, maxX] (evita segmenti che tornano indietro)
+            survivors.forEach(s => {
+                if (s.m !== Infinity) {
+                    if (s.xf > maxX) { s.xf = maxX; s.yf = s.m * maxX + s.q; }
+                    if (s.xi < minX) { s.xi = minX; s.yi = s.m * minX + s.q; }
+                }
+            });
+
+            // Filtra degeneri e estendi primo/ultimo
+            const validSurvivors = survivors.filter(s => s.xi < s.xf - 1e-10);
+            if (validSurvivors.length > 0) {
+                const s0 = validSurvivors[0];
+                if (s0.m !== Infinity) { s0.xi = minX; s0.yi = s0.m * minX + s0.q; }
+                const sN = validSurvivors[validSurvivors.length - 1];
+                if (sN.m !== Infinity) { sN.xf = maxX; sN.yf = sN.m * maxX + sN.q; }
+            }
+
             // Costruisci polilinea dai sopravvissuti
             chartState.offsetPolyline = [];
-            survivors.forEach((s, i) => {
+            validSurvivors.forEach((s, i) => {
                 if (i === 0) {
                     chartState.offsetPolyline.push({ x: s.xi, y: s.yi });
                 }
