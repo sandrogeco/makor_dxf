@@ -13,10 +13,9 @@
 7. [Interpolazione](#7-interpolazione)
 8. [Limiti orizzontali (L1 / L2)](#8-limiti-orizzontali-l1--l2)
 9. [Offset parallelo](#9-offset-parallelo)
-10. [Offset verticale (Y)](#10-offset-verticale-y)
-11. [Esportazione CSV](#11-esportazione-csv)
-12. [Unità di misura](#12-unità-di-misura)
-13. [Zoom e navigazione](#13-zoom-e-navigazione)
+10. [Esportazione CSV](#10-esportazione-csv)
+11. [Unità di misura](#11-unità-di-misura)
+12. [Zoom e navigazione](#12-zoom-e-navigazione)
 
 ---
 
@@ -103,7 +102,7 @@ Il pannello sinistro contiene tutte le impostazioni operative, organizzate in se
 
 Il grafico mostra il profilo con:
 - Curva originale in **arancione**
-- Curva offset parallela in **arancione tratteggiato** (quando attiva)
+- Curva offset parallela in **arancione scuro** (quando attiva)
 - Linee limite L1 e L2 in **rosso/verde** (trascinabili)
 - Griglia di riferimento in grigio chiaro
 - Assi con valori nell'unità di misura selezionata
@@ -306,13 +305,13 @@ Il CSV esportato conterrà solo i punti con `X ≥ min(L1, L2)` e `X ≤ max(L1,
 
 L'offset parallelo calcola una nuova curva a **distanza costante** dal profilo originale, misurata perpendicolarmente in ogni punto. Questo è equivalente a traslare ogni segmento nella direzione della sua normale.
 
-> 📷 **[IMMAGINE: schema esplicativo — profilo originale arancione, frecce perpendicolari di lunghezza d, curva offset tratteggiata a distanza d]**
+> 📷 **[IMMAGINE: schema esplicativo — profilo originale in arancione chiaro, frecce perpendicolari di lunghezza d, curva offset in arancione scuro a distanza d]**
 
 ### 9.2 Utilizzo
 
-1. Impostare la **distanza di offset** nel campo apposito (valore positivo = offset verso l'alto/sinistra)
+1. Impostare la **distanza di offset** nel campo apposito (valore positivo = sposta la curva verso l'alto, negativo verso il basso)
 2. Premere **Applica Offset**
-3. La curva offset appare in arancione tratteggiato
+3. La curva offset appare in arancione scuro
 4. La curva offset è quella che verrà esportata se presente (priorità sull'originale)
 
 ### 9.3 Estensione ai bordi
@@ -327,30 +326,22 @@ La curva offset viene automaticamente **estesa o tagliata** alle coordinate X de
 
 ---
 
-## 10. Offset verticale (Y)
+## 10. Esportazione CSV
 
-Il campo **Offset Y** nel pannello sinistro applica una traslazione verticale **visiva** al profilo sul grafico. Utile per confrontare visivamente la curva con un riferimento.
-
-**Attenzione:** l'offset Y è solo visivo e non viene incluso nell'esportazione. I punti esportati mantengono le coordinate Y originali.
-
----
-
-## 11. Esportazione CSV
-
-### 11.1 Procedura
+### 10.1 Procedura
 
 1. Selezionare l'**unità di misura di esportazione** nel selettore accanto al pulsante (es. `mm`, `m`)
 2. Premere **💾 Esporta CSV**
 3. Scegliere nome e posizione del file nella finestra di dialogo
 
-### 11.2 Contenuto del file esportato
+### 10.2 Contenuto del file esportato
 
 Il CSV esportato contiene:
 
 - **Intestazione:** `x_mm,y_mm` (o con l'unità selezionata, es. `x_m,y_m`)
 - **Punti:** solo quelli compresi tra L1 e L2, ordinati per X crescente
 - **Origine X a zero:** la X del primo punto viene sottratta da tutti i punti → il profilo parte sempre da X = 0
-- **Coordinata Y:** coordinate originali senza offset verticale
+- **Coordinata Y:** coordinate Y originali (l'offset parallelo agisce sulla forma della curva, non traslando la Y)
 
 **Esempio di output:**
 
@@ -362,11 +353,11 @@ x_mm,y_mm
 ...
 ```
 
-### 11.3 Priorità di esportazione
+### 10.3 Priorità di esportazione
 
 Se è presente una **curva offset** (calcolata con Applica Offset), viene esportata quella al posto del profilo originale. Se non è presente offset, vengono esportati i segmenti originali del DXF (o i punti del CSV importato).
 
-### 11.4 Conversione unità
+### 10.4 Conversione unità
 
 Se l'unità del file sorgente è nota (rilevata dal DXF o impostata manualmente) e l'unità di esportazione è diversa, i valori vengono convertiti automaticamente.
 
@@ -380,17 +371,17 @@ Se l'unità del file sorgente è nota (rilevata dal DXF o impostata manualmente)
 
 ---
 
-## 12. Unità di misura
+## 11. Unità di misura
 
 Il selettore **UM** nella barra sinistra imposta l'unità di misura per la visualizzazione degli assi e per i valori numerici dei controlli (L1, L2, passo, offset).
 
 **Unità disponibili:** `mm`, `cm`, `m`, `in`, `ft`
 
-Se il file DXF contiene l'intestazione `$INSUNITS`, l'unità viene rilevata automaticamente e il selettore viene bloccato (non modificabile). Per forzare un'unità diversa, ricaricare il file dopo aver modificato il selettore.
+Se il file DXF contiene l'intestazione `$INSUNITS`, l'unità viene rilevata automaticamente e il selettore viene bloccato (non modificabile). Per usare un'unità diversa, caricare un file DXF senza `$INSUNITS` oppure un CSV, e impostare manualmente il selettore prima di esportare.
 
 ---
 
-## 13. Zoom e navigazione
+## 12. Zoom e navigazione
 
 ### Barra di zoom
 
