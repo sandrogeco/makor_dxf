@@ -104,7 +104,7 @@ Il pannello sinistro contiene tutte le impostazioni operative, organizzate in se
 Il grafico mostra il profilo con:
 - Curva originale in **arancione**
 - Curva offset parallela in **arancione tratteggiato** (quando attiva)
-- Linee limite L1 e L2 in **blu/verde** (trascinabili)
+- Linee limite L1 e L2 in **rosso/verde** (trascinabili)
 - Griglia di riferimento in grigio chiaro
 - Assi con valori nell'unità di misura selezionata
 
@@ -211,8 +211,7 @@ Il valore si imposta nel campo **Precisione** nella sezione "Passo Interpolazion
 
 - **Unità:** nell'unità di misura corrente (mm, m, ecc.)
 - **Valore di default:** 0.005
-- **Consiglio:** per profili di precisione usare 0.001–0.005; per profili approssimativi usare 0.01–0.05
-
+- 
 > 📷 **[IMMAGINE: dettaglio sezione interpolazione nel pannello con frecce sui campi Precisione e Modalità]**
 
 ### 7.3 Modalità di interpolazione
@@ -316,21 +315,11 @@ L'offset parallelo calcola una nuova curva a **distanza costante** dal profilo o
 3. La curva offset appare in arancione tratteggiato
 4. La curva offset è quella che verrà esportata se presente (priorità sull'originale)
 
-### 9.3 Gestione delle intersezioni
-
-Quando il profilo ha angoli concavi, le rette offset di segmenti adiacenti si intersecano creando auto-intersezioni. L'algoritmo risolve automaticamente questo problema tramite un meccanismo di **backtracking**:
-
-- I segmenti offset vengono processati da sinistra a destra
-- Quando un nuovo segmento si interseca con i precedenti, i tratti "rientrati" (che si troverebbero all'interno della curva) vengono rimossi
-- Il punto di intersezione diventa il nuovo punto di giunzione
-
-> 📷 **[IMMAGINE: esempio di angolo concavo — sinistra: profilo originale con angolo rientrante; destra: curva offset corretta dopo backtracking, senza loop]**
-
-### 9.4 Estensione ai bordi
+### 9.3 Estensione ai bordi
 
 La curva offset viene automaticamente **estesa o tagliata** alle coordinate X del primo e dell'ultimo punto del profilo originale. Questo garantisce che la curva offset copra l'intero range del profilo senza tratti che escono dall'area di interesse.
 
-### 9.5 Limiti dell'algoritmo
+### 9.4 Limiti dell'algoritmo
 
 - **Angoli molto acuti** con offset grande: il punto di intersezione può cadere molto lontano, fuori dal range del profilo. Il sistema taglia automaticamente al limite.
 - **Raggio di curvatura inferiore alla distanza di offset**: la curva interna collassa. Ridurre l'offset.
