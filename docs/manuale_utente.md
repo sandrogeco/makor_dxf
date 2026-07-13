@@ -87,8 +87,6 @@ X,Y
 
 ## 3. Interfaccia
 
-> 📷 **[Figura 2 — IMMAGINE: interfaccia annotata con frecce che indicano: 1) area grafico, 2) pannello sinistro controlli, 3) barra zoom in basso, 4) selettore UM, 5) pulsanti importa/esporta, 6) stato connessione in alto]**
-
 ### Pannello sinistro
 
 Il pannello sinistro contiene tutte le impostazioni operative, organizzate in sezioni:
@@ -138,8 +136,6 @@ File DXF
 [Esporta CSV]  ──→  File di punti pronto per la macchina
 ```
 
-> 📷 **[Figura 3 — IMMAGINE: diagramma a blocchi del flusso di lavoro, con le stesse fasi sopra rappresentate graficamente con icone]**
-
 ---
 
 ## 5. Importazione DXF
@@ -149,8 +145,6 @@ File DXF
 3. Il sistema estrae automaticamente tutte le entità supportate e le converte in una sequenza di punti interpolati
 4. Il grafico si aggiorna mostrando il profilo completo
 5. La barra di stato mostra il numero di punti estratti e le entità riconosciute (es. `Caricati 1243 punti — 3 splines, 2 archi`)
-
-> 📷 **[Figura 4 — IMMAGINE: grafico dopo importazione DXF con profilo visibile, evidenziare la barra di stato con il conteggio punti]**
 
 **Nota:** se il DXF contiene entità non supportate o corrotte, vengono silenziosamente ignorate. Se il profilo appare incompleto, verificare nel CAD che tutte le entità siano di tipo supportato (§2.1).
 
