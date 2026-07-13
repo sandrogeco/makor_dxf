@@ -369,7 +369,7 @@ Il selettore **UM** nella barra sinistra imposta l'unità di misura per la visua
 
 **Unità disponibili:** `mm`, `cm`, `m`, `in`, `ft`
 
-Se il file DXF contiene l'intestazione `$INSUNITS`, l'unità viene rilevata automaticamente e il selettore viene bloccato (non modificabile). Per usare un'unità diversa, caricare un file DXF senza `$INSUNITS` oppure un CSV, e impostare manualmente il selettore prima di esportare.
+Se il file DXF contiene l'intestazione `$INSUNITS`, l'unità viene rilevata automaticamente e preimpostata nel selettore. Il selettore rimane comunque modificabile: se le coordinate nel DXF non corrispondono all'unità dichiarata (situazione comune con alcuni CAD come Onshape), selezionare manualmente l'unità corretta dopo l'import.
 
 ---
 

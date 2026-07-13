@@ -1574,8 +1574,8 @@
             const umSelect = document.getElementById('umSelect');
             if (umSelect) {
                 umSelect.value = chartState.um || '';
-                umSelect.disabled = chartState.umFromDxf;
-                umSelect.title = chartState.umFromDxf ? t('label_um_from_dxf') : '';
+                umSelect.disabled = false;
+                umSelect.title = '';
             }
         }
 
