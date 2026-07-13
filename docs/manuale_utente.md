@@ -29,7 +29,7 @@ Il visualizzatore profilo consente di:
 - Calcolare la **curva offset parallela** a distanza configurabile
 - Esportare i punti risultanti come **CSV** pronto per il controllo macchina
 
-> 📷 **[IMMAGINE: schermata completa dell'applicazione con un profilo caricato, evidenziare le zone principali: grafico, pannello sinistro, barra di zoom]**
+> 📷 **[Figura 1 — IMMAGINE: schermata completa dell'applicazione con un profilo caricato, evidenziare le zone principali: grafico, pannello sinistro, barra di zoom]**
 
 ---
 
@@ -87,7 +87,7 @@ X,Y
 
 ## 3. Interfaccia
 
-> 📷 **[IMMAGINE: interfaccia annotata con frecce che indicano: 1) area grafico, 2) pannello sinistro controlli, 3) barra zoom in basso, 4) selettore UM, 5) pulsanti importa/esporta, 6) stato connessione in alto]**
+> 📷 **[Figura 2 — IMMAGINE: interfaccia annotata con frecce che indicano: 1) area grafico, 2) pannello sinistro controlli, 3) barra zoom in basso, 4) selettore UM, 5) pulsanti importa/esporta, 6) stato connessione in alto]**
 
 ### Pannello sinistro
 
@@ -138,7 +138,7 @@ File DXF
 [Esporta CSV]  ──→  File di punti pronto per la macchina
 ```
 
-> 📷 **[IMMAGINE: diagramma a blocchi del flusso di lavoro, con le stesse fasi sopra rappresentate graficamente con icone]**
+> 📷 **[Figura 3 — IMMAGINE: diagramma a blocchi del flusso di lavoro, con le stesse fasi sopra rappresentate graficamente con icone]**
 
 ---
 
@@ -150,7 +150,7 @@ File DXF
 4. Il grafico si aggiorna mostrando il profilo completo
 5. La barra di stato mostra il numero di punti estratti e le entità riconosciute (es. `Caricati 1243 punti — 3 splines, 2 archi`)
 
-> 📷 **[IMMAGINE: grafico dopo importazione DXF con profilo visibile, evidenziare la barra di stato con il conteggio punti]**
+> 📷 **[Figura 4 — IMMAGINE: grafico dopo importazione DXF con profilo visibile, evidenziare la barra di stato con il conteggio punti]**
 
 **Nota:** se il DXF contiene entità non supportate o corrotte, vengono silenziosamente ignorate. Se il profilo appare incompleto, verificare nel CAD che tutte le entità siano di tipo supportato (§2.1).
 
@@ -168,7 +168,7 @@ Un profilo aperto è una sequenza di curve con punto iniziale e finale distinti,
 - X crescente da inizio a fine (nessuna re-entranza in X)
 - Profilo contenuto nel piano XY (Z = 0 nel DXF)
 
-> 📷 **[IMMAGINE: esempio profilo aperto — curva che si sviluppa da sinistra a destra senza chiudersi]**
+> 📷 **[Figura 5 — IMMAGINE: esempio profilo aperto — curva che si sviluppa da sinistra a destra senza chiudersi]**
 
 ### 6.2 Spline
 
@@ -189,7 +189,7 @@ L'algoritmo di offset parallelo gestisce automaticamente le auto-intersezioni tr
 | Profilo con inversione in X (torna indietro) | L'ordinamento per X può produrre risultati errati | Evitare curve con re-entranze in X |
 | Raggio di curvatura < distanza offset | La curva interna collassa su se stessa | Ridurre la distanza di offset |
 
-> 📷 **[IMMAGINE: due esempi affiancati — offset corretto su profilo regolare a sinistra, offset con angolo acuto problematico a destra con evidenziazione della zona critica]**
+> 📷 **[Figura 6 — IMMAGINE: due esempi affiancati — offset corretto su profilo regolare a sinistra, offset con angolo acuto problematico a destra con evidenziazione della zona critica]**
 
 ---
 
@@ -209,7 +209,7 @@ Il valore si imposta nel campo **Precisione** nella sezione "Passo Interpolazion
 - **Unità:** nell'unità di misura corrente (mm, m, ecc.)
 - **Valore di default:** 0.005
 - 
-> 📷 **[IMMAGINE: dettaglio sezione interpolazione nel pannello con frecce sui campi Precisione e Modalità]**
+> 📷 **[Figura 7 — IMMAGINE: dettaglio sezione interpolazione nel pannello con frecce sui campi Precisione e Modalità]**
 
 ### 7.3 Modalità di interpolazione
 
@@ -238,7 +238,7 @@ dove `lunghezza_arco = raggio × angolo_in_radianti`
 **Esempio:** un arco di raggio 10mm e ampiezza 90° con passo 0.5mm genera:  
 `lunghezza = 10 × π/2 ≈ 15.7mm` → circa 31 punti
 
-> 📷 **[IMMAGINE: confronto visivo — profilo con punti generati in modalità lunghezza geometrica, distribuzione uniforme anche nelle zone inclinate]**
+> 📷 **[Figura 8 — IMMAGINE: confronto visivo — profilo con punti generati in modalità lunghezza geometrica, distribuzione uniforme anche nelle zone inclinate]**
 
 ---
 
@@ -264,7 +264,7 @@ Si calcola l'escursione in X dell'arco (considerando gli eventuali attraversamen
 
 **Attenzione:** su segmenti molto inclinati (quasi verticali), questa modalità genera pochissimi punti. Su archi che attraversano i 90° o i 270°, la proiezione in X può essere ridotta: verificare sempre il risultato visivamente.
 
-> 📷 **[IMMAGINE: confronto con Modalità A — stessa curva, punti distribuiti a passo costante in X, evidenziare la minore densità nelle zone verticali]**
+> 📷 **[Figura 9 — IMMAGINE: confronto con Modalità A — stessa curva, punti distribuiti a passo costante in X, evidenziare la minore densità nelle zone verticali]**
 
 ---
 
@@ -289,7 +289,7 @@ I limiti L1 e L2 definiscono la **zona di interesse** del profilo: solo i punti 
 
 **Tramite input numerico:** digitare il valore nel campo corrispondente (L1 e L2 nel pannello sinistro).
 
-> 📷 **[IMMAGINE: grafico con L1 e L2 visibili come linee verticali colorate, frecce che indicano la zona compresa tra i due limiti evidenziata]**
+> 📷 **[Figura 10 — IMMAGINE: grafico con L1 e L2 visibili come linee verticali colorate, frecce che indicano la zona compresa tra i due limiti evidenziata]**
 
 ### Comportamento all'esportazione
 
@@ -303,7 +303,7 @@ Il CSV esportato conterrà solo i punti con `X ≥ min(L1, L2)` e `X ≤ max(L1,
 
 L'offset parallelo calcola una nuova curva a **distanza costante** dal profilo originale, misurata perpendicolarmente in ogni punto. Questo è equivalente a traslare ogni segmento nella direzione della sua normale.
 
-> 📷 **[IMMAGINE: schema esplicativo — profilo originale in arancione chiaro, frecce perpendicolari di lunghezza d, curva offset in arancione scuro a distanza d]**
+> 📷 **[Figura 11 — IMMAGINE: schema esplicativo — profilo originale in arancione chiaro, frecce perpendicolari di lunghezza d, curva offset in arancione scuro a distanza d]**
 
 ### 9.2 Utilizzo
 
@@ -392,7 +392,7 @@ La barra sotto il grafico ha due cursori (sinistro e destro) che definiscono la 
 
 Le etichette degli assi si aggiornano mostrando i valori correnti della finestra visibile.
 
-> 📷 **[IMMAGINE: barra di zoom evidenziata con i due cursori, frecce che mostrano la corrispondenza tra la posizione dei cursori e la zona visibile nel grafico]**
+> 📷 **[Figura 12 — IMMAGINE: barra di zoom evidenziata con i due cursori, frecce che mostrano la corrispondenza tra la posizione dei cursori e la zona visibile nel grafico]**
 
 ### Scale degli assi
 
