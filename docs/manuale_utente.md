@@ -158,29 +158,27 @@ File DXF
 
 ## 6. Tipi di curva e compatibilità
 
-### 6.1 Profili aperti (consigliati)
+> ⚠️ **Il sistema è progettato esclusivamente per profili aperti.** Un profilo aperto ha un punto iniziale e un punto finale distinti e si sviluppa con X monotonamente crescente (da sinistra a destra). Profili chiusi (cerchi, polilinee chiuse, ecc.) non sono supportati e producono risultati imprevedibili.
 
-Un **profilo aperto** è una sequenza di curve che ha un punto iniziale e un punto finale distinti. È il caso tipico di un profilo di lavorazione, di una camma o di una sezione.
+### 6.1 Profilo aperto
 
-> 📷 **[IMMAGINE: esempio profilo aperto — curva che va da sinistra a destra senza chiudersi]**
+Un profilo aperto è una sequenza di curve con punto iniziale e finale distinti, tipicamente un profilo di lavorazione, una camma o una sezione.
 
-Questi profili funzionano ottimamente con tutte le funzionalità: interpolazione, limiti L1/L2, offset parallelo.
+**Requisiti:**
+- X crescente da inizio a fine (nessuna re-entranza in X)
+- Profilo contenuto nel piano XY (Z = 0 nel DXF)
 
-### 6.2 Profili chiusi (uso limitato)
+> 📷 **[IMMAGINE: esempio profilo aperto — curva che si sviluppa da sinistra a destra senza chiudersi]**
 
-Un **profilo chiuso** (cerchio, ellisse, rettangolo, polilinea chiusa) si richiude su se stesso. Sono supportati per la visualizzazione e l'esportazione, ma l'algoritmo di offset parallelo è ottimizzato per profili aperti con andamento monotono in X: su profili chiusi può produrre risultati imprevisti.
-
-> 📷 **[IMMAGINE: esempio profilo chiuso (ovale) con freccia che mostra il punto di "rottura" dove l'algoritmo ha difficoltà]**
-
-### 6.3 Spline
+### 6.2 Spline
 
 Le spline B-spline vengono prima campionate ad alta risoluzione tramite interpolazione Catmull-Rom sui punti di controllo, poi ricampionate con il passo di interpolazione impostato. Se la spline ha `fitPoints` (punti di passaggio), vengono usati quelli al posto dei punti di controllo.
 
-### 6.4 Archi
+### 6.3 Archi
 
 Gli archi vengono interpolati calcolando la suddivisione angolare necessaria a rispettare il passo impostato (in modalità lunghezza) o il passo sull'asse X (in modalità delta X).
 
-### 6.5 Curve problematiche per l'offset
+### 6.4 Curve problematiche per l'offset
 
 L'algoritmo di offset parallelo gestisce automaticamente le auto-intersezioni tramite backtracking, ma alcune geometrie richiedono attenzione:
 
