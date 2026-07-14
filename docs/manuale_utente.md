@@ -166,7 +166,7 @@ Un profilo aperto è una sequenza di curve con punto iniziale e finale distinti,
 
 ### 6.2 Spline
 
-Le curve SPLINE vengono valutate con l'**algoritmo di de Boor** (B-Spline). Se il DXF contiene il vettore dei nodi (group code 40), viene usato direttamente; altrimenti viene generato automaticamente un vettore nodo clamped uniforme di grado appropriato.
+Le curve SPLINE vengono valutate con l'**algoritmo di de Boor** (B-Spline). Se il DXF contiene il vettore dei nodi (group code 40), viene usato direttamente; altrimenti viene generato automaticamente in modo che la curva passi esattamente per il primo e l'ultimo punto di controllo con spaziatura regolare.
 
 Il calcolo avviene sui **punti di controllo** (group code 10/20). I punti di fitting (group code 11/21), se presenti, vengono usati come fallback solo quando i punti di controllo non sono disponibili.
 
@@ -187,7 +187,6 @@ L'algoritmo di offset parallelo gestisce automaticamente le auto-intersezioni tr
 | Profilo con inversione in X (torna indietro) | L'ordinamento per X può produrre risultati errati | Evitare curve con re-entranze in X |
 | Raggio di curvatura < distanza offset | La curva interna collassa su se stessa | Ridurre la distanza di offset |
 
-> 📷 **[Figura 6 — IMMAGINE: due esempi affiancati — offset corretto su profilo regolare a sinistra, offset con angolo acuto problematico a destra con evidenziazione della zona critica]**
 
 ---
 

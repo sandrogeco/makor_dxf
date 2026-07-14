@@ -1794,7 +1794,7 @@
                 const pts = chartState.data;
                 for (let i = 0; i < pts.length; i++) {
                     ctx.beginPath();
-                    ctx.arc(transformX(pts[i].x), transformY(pts[i].y + chartState.offsetY), 2, 0, 2 * Math.PI);
+                    ctx.arc(transformX(pts[i].x), transformY(pts[i].y + chartState.offsetY), 4, 0, 2 * Math.PI);
                     ctx.fill();
                 }
             }
@@ -1933,7 +1933,7 @@
             ctx.fillText(line1Label, line1ScreenX + 5, padding + 15);
 
             // Limite 2 (verde)
-            ctx.strokeStyle = '#44ff44';
+            ctx.strokeStyle = '#1a8c1a';
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
             ctx.beginPath();
@@ -1943,7 +1943,7 @@
             ctx.setLineDash([]);
 
             // Label Limite 2 con coordinate X e Y
-            ctx.fillStyle = '#44ff44';
+            ctx.fillStyle = '#1a8c1a';
             ctx.font = '11px JetBrains Mono';
             ctx.textAlign = 'left';
             const line2Label = 'L2: X=' + chartState.line2X.toFixed(decimalsX) +
