@@ -546,6 +546,9 @@
                     <span data-i18n="label_points_generated">Punti generati:</span>
                     <span id="generatedPointsCount" style="color: var(--accent-color); font-weight: bold;">0</span>
                 </div>
+                <button id="togglePointsBtn" class="control-btn full-width" onclick="toggleShowPoints()" style="margin-top: 8px;">
+                    <span data-i18n="label_show_points">Mostra Punti</span>
+                </button>
             </div>
 
             <!-- Limiti Orizzontali -->
@@ -797,6 +800,7 @@
         let INTERPOLATION_MODE = 'geometric'; // 'geometric' o 'deltaX'
 
         let _autoStepApplied = false; // si resetta solo al caricamento di un file nuovo
+        let showInterpolatedPoints = false;
 
         // Salva l'ultimo file caricato per refresh automatico
         let lastDxfString = null;
@@ -1539,6 +1543,17 @@
             drawChart();
         }
 
+        function toggleShowPoints() {
+            showInterpolatedPoints = !showInterpolatedPoints;
+            const btn = document.getElementById('togglePointsBtn');
+            if (btn) {
+                btn.querySelector('span').setAttribute('data-i18n', showInterpolatedPoints ? 'label_hide_points' : 'label_show_points');
+                btn.querySelector('span').textContent = t(showInterpolatedPoints ? 'label_hide_points' : 'label_show_points');
+                btn.style.background = showInterpolatedPoints ? 'var(--accent-blue)' : '';
+            }
+            drawChart();
+        }
+
         function setInterpolationStep(value) {
             INTERPOLATION_STEP = parseFloat(value) || 0.005;
             // Aggiorna step delle linee verticali e offset Y
@@ -1754,6 +1769,17 @@
                     else ctx.lineTo(x, y);
                 });
                 ctx.stroke();
+            }
+
+            // Punti interpolati (se attivati)
+            if (showInterpolatedPoints && chartState.data.length > 0) {
+                ctx.fillStyle = '#e07828';
+                const pts = chartState.data;
+                for (let i = 0; i < pts.length; i++) {
+                    ctx.beginPath();
+                    ctx.arc(transformX(pts[i].x), transformY(pts[i].y + chartState.offsetY), 2, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
             }
 
             // DEBUG: Disegna le rette offset (linee sottili verdi)
@@ -3148,6 +3174,8 @@ label_interpolation,Interpolazione,Interpolation
 label_range_x,Range X,Range X
 label_range_y,Range Y,Range Y
 label_um,Unità,Unit
+label_show_points,Mostra Punti,Show Points
+label_hide_points,Nascondi Punti,Hide Points
 label_um_from_dxf,Unità rilevata dal file DXF (non modificabile),Unit detected from DXF file (read-only)
 label_export_um,Unità esportazione,Export unit
 canvas_no_data,Nessun dato disponibile.,No data available.
