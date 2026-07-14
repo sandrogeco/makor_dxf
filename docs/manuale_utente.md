@@ -204,7 +204,7 @@ Un passo **grande** produce meno punti, sufficiente per profili con curvature gr
 Il valore si imposta nel campo **Precisione** nella sezione "Passo Interpolazione".
 
 - **Unità:** nell'unità di misura corrente (mm, m, ecc.)
-- **Valore automatico:** al caricamento di un file, il passo viene calcolato automaticamente come `rangeX / 100` arrotondato alla prima cifra significativa (es. range 100mm → passo 1mm, range 0.1mm → passo 0.001mm). Il valore può essere modificato manualmente in qualsiasi momento.
+- **Valore automatico:** al caricamento di un file, il passo viene impostato automaticamente al massimo scarto in X tra due punti consecutivi del file sorgente, arrotondato alla prima cifra significativa. Questo garantisce che ogni gap originale riceva almeno un punto interpolato, usando il passo più grande possibile. Il valore può essere modificato manualmente in qualsiasi momento.
 
 > 📷 **[Figura 7 — IMMAGINE: dettaglio sezione interpolazione nel pannello con frecce sui campi Precisione e Modalità]**
 

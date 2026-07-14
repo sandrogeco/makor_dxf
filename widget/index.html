@@ -923,7 +923,7 @@
                 const rangeX = chartState.axisMaxX - chartState.axisMinX;
                 if (rangeX > 0) {
                     _autoStepApplied = true;
-                    const autoStep = floorToFirstSigFig(rangeX / 100);
+                    const autoStep = floorToFirstSigFig(calcMaxDeltaX(chartState.data) || rangeX / 100);
                     INTERPOLATION_STEP = autoStep;
                     const autoStepStr = autoStep.toPrecision(1);
                     document.getElementById('interpolationInput').value = autoStepStr;
@@ -1550,6 +1550,15 @@
             if (x <= 0) return x;
             const mag = Math.pow(10, Math.floor(Math.log10(x)));
             return Math.floor(x / mag) * mag;
+        }
+
+        function calcMaxDeltaX(pts) {
+            let maxDx = 0;
+            for (let i = 1; i < pts.length; i++) {
+                const dx = Math.abs(pts[i].x - pts[i - 1].x);
+                if (dx > maxDx) maxDx = dx;
+            }
+            return maxDx;
         }
 
         function toggleShowPoints() {
@@ -2307,7 +2316,7 @@
                     const rangeX = chartState.axisMaxX - chartState.axisMinX;
                     if (rangeX > 0) {
                         _autoStepApplied = true;
-                        const autoStep = floorToFirstSigFig(rangeX / 100);
+                        const autoStep = floorToFirstSigFig(calcMaxDeltaX(chartState.data) || rangeX / 100);
                         INTERPOLATION_STEP = autoStep;
                         const autoStepStr = autoStep.toPrecision(1);
                         document.getElementById('interpolationInput').value = autoStepStr;
