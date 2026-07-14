@@ -29,7 +29,7 @@ Il visualizzatore profilo consente di:
 - Calcolare la **curva offset parallela** a distanza configurabile
 - Esportare i punti risultanti come **CSV** pronto per il controllo macchina
 
-> 📷 **[Figura 1 — IMMAGINE: schermata completa dell'applicazione con un profilo caricato, evidenziare le zone principali: grafico, pannello in basso, barra di zoom]**
+![Figura 1](1.png)
 
 ---
 
@@ -162,7 +162,7 @@ Un profilo aperto è una sequenza di curve con punto iniziale e finale distinti,
 - X crescente da inizio a fine (nessuna re-entranza in X)
 - Profilo contenuto nel piano XY (Z = 0 nel DXF)
 
-> 📷 **[Figura 5 — IMMAGINE: esempio profilo aperto — curva che si sviluppa da sinistra a destra senza chiudersi]**
+![Figura 5](5.png)
 
 ### 6.2 Spline
 
@@ -206,7 +206,9 @@ Il valore si imposta nel campo **Precisione** nella sezione "Passo Interpolazion
 - **Unità:** nell'unità di misura corrente (mm, m, ecc.)
 - **Valore automatico:** al caricamento di un file, il passo viene impostato automaticamente al massimo scarto in X tra due punti consecutivi del file sorgente, arrotondato alla prima cifra significativa. Questo garantisce che ogni gap originale riceva almeno un punto interpolato, usando il passo più grande possibile. Il valore può essere modificato manualmente in qualsiasi momento.
 
-> 📷 **[Figura 7 — IMMAGINE: dettaglio sezione interpolazione nel pannello con frecce sui campi Precisione e Modalità]**
+![Figura 7a](7a.png)
+
+![Figura 7b](7b.png)
 
 ### 7.3 Modalità di interpolazione
 
@@ -235,7 +237,7 @@ dove `lunghezza_arco = raggio × angolo_in_radianti`
 **Esempio:** un arco di raggio 10mm e ampiezza 90° con passo 0.5mm genera:  
 `lunghezza = 10 × π/2 ≈ 15.7mm` → circa 31 punti
 
-> 📷 **[Figura 8 — IMMAGINE: confronto visivo — profilo con punti generati in modalità lunghezza geometrica, distribuzione uniforme anche nelle zone inclinate]**
+![Figura 8](8.png)
 
 ---
 
@@ -261,7 +263,7 @@ Si calcola l'escursione in X dell'arco (considerando gli eventuali attraversamen
 
 **Attenzione:** su segmenti molto inclinati (quasi verticali), questa modalità genera pochissimi punti. Su archi che attraversano i 90° o i 270°, la proiezione in X può essere ridotta: verificare sempre il risultato visivamente.
 
-> 📷 **[Figura 9 — IMMAGINE: confronto con Modalità A — stessa curva, punti distribuiti a passo costante in X, evidenziare la minore densità nelle zone verticali]**
+![Figura 9](9.png)
 
 ---
 
@@ -292,7 +294,7 @@ I limiti L1 e L2 definiscono la **zona di interesse** del profilo: solo i punti 
 
 **Tramite input numerico:** digitare il valore nel campo corrispondente (L1 e L2 nel pannello in basso).
 
-> 📷 **[Figura 10 — IMMAGINE: grafico con L1 e L2 visibili come linee verticali colorate, frecce che indicano la zona compresa tra i due limiti evidenziata]**
+![Figura 10](10.png)
 
 ### Comportamento all'esportazione
 
@@ -306,7 +308,7 @@ Il CSV esportato conterrà solo i punti con `X ≥ min(L1, L2)` e `X ≤ max(L1,
 
 L'offset parallelo calcola una nuova curva a **distanza costante** dal profilo originale, misurata perpendicolarmente in ogni punto. Questo è equivalente a traslare ogni segmento nella direzione della sua normale.
 
-> 📷 **[Figura 11 — IMMAGINE: schema esplicativo — profilo originale in arancione chiaro, frecce perpendicolari di lunghezza d, curva offset in arancione scuro a distanza d]**
+![Figura 11](11.png)
 
 ### 9.2 Utilizzo
 
@@ -395,7 +397,7 @@ La barra sotto il grafico ha due cursori (sinistro e destro) che definiscono la 
 
 Le etichette degli assi si aggiornano mostrando i valori correnti della finestra visibile.
 
-> 📷 **[Figura 12 — IMMAGINE: barra di zoom evidenziata con i due cursori, frecce che mostrano la corrispondenza tra la posizione dei cursori e la zona visibile nel grafico]**
+![Figura 12](12.png)
 
 ### Scale degli assi
 
