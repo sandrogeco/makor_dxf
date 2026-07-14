@@ -1664,10 +1664,9 @@
             const plotWidth = width - 2 * padding;
             const plotHeight = height - 2 * padding;
 
-            // Scala 1:1 per X e Y
+            // Scale indipendenti per X e Y: riempie il canvas, etichette e dati sempre allineati
             const scaleX = plotWidth / rangeX;
             const scaleY = plotHeight / rangeY;
-            const scale = Math.min(scaleX, scaleY);
 
             // Applica offset Y ai dati per disegnare (l'asse rimane fisso)
             const dataWithOffset = chartState.data.map(p => ({
@@ -1675,22 +1674,20 @@
                 y: p.y + chartState.offsetY
             }));
 
-            const transformX = (x) => padding + (x - minX) * scale;
-            const transformY = (y) => height - padding - (y - minY) * scale;
+            const transformX = (x) => padding + (x - minX) * scaleX;
+            const transformY = (y) => height - padding - (y - minY) * scaleY;
 
-            // Grid — allineata ai dati (usa scale 1:1)
+            // Grid
             ctx.strokeStyle = '#e0e0e0';
             ctx.lineWidth = 1;
             for (let i = 0; i <= 10; i++) {
-                const xVal = minX + rangeX * (i / 10);
-                const x = transformX(xVal);
+                const x = padding + plotWidth * (i / 10);
                 ctx.beginPath();
                 ctx.moveTo(x, padding);
                 ctx.lineTo(x, height - padding);
                 ctx.stroke();
 
-                const yVal = minY + rangeY * (i / 10);
-                const y = transformY(yVal);
+                const y = padding + plotHeight * (i / 10);
                 ctx.beginPath();
                 ctx.moveTo(padding, y);
                 ctx.lineTo(width - padding, y);
@@ -1719,15 +1716,15 @@
 
             const umSuffix = chartState.um ? ' ' + chartState.um : '';
             for (let i = 0; i <= 5; i++) {
+                const screenX = padding + plotWidth * (i / 5);
                 const value = minX + rangeX * (i / 5);
-                const screenX = transformX(value);
                 ctx.fillText(value.toFixed(decimalsX) + (i === 5 ? umSuffix : ''), screenX, height - padding + 20);
             }
 
             ctx.textAlign = 'right';
             for (let i = 0; i <= 5; i++) {
+                const screenY = padding + plotHeight * (i / 5);
                 const value = maxY - rangeY * (i / 5);
-                const screenY = transformY(value);
                 ctx.fillText(value.toFixed(decimalsY) + (i === 5 ? umSuffix : ''), padding - 10, screenY + 4);
             }
 
@@ -2844,10 +2841,8 @@
             const rangeY = maxY - minY;
 
             const scaleX = plotWidth / rangeX;
-            const scaleY = plotHeight / rangeY;
-            const scale = Math.min(scaleX, scaleY);
 
-            const transformX = (x) => padding + (x - minX) * scale;
+            const transformX = (x) => padding + (x - minX) * scaleX;
             const line1ScreenX = transformX(chartState.line1X);
             const line2ScreenX = transformX(chartState.line2X);
 
@@ -2881,11 +2876,9 @@
             const rangeY = maxY - minY;
 
             const scaleX = plotWidth / rangeX;
-            const scaleY = plotHeight / rangeY;
-            const scale = Math.min(scaleX, scaleY);
 
-            const transformX = (x) => padding + (x - minX) * scale;
-            const inverseTransformX = (screenX) => minX + (screenX - padding) / scale;
+            const transformX = (x) => padding + (x - minX) * scaleX;
+            const inverseTransformX = (screenX) => minX + (screenX - padding) / scaleX;
 
             if (isDraggingLine) {
                 const dataX = inverseTransformX(mouseX);
