@@ -50,7 +50,7 @@ Il formato DXF (Drawing Exchange Format) è lo standard di interscambio CAD.
 | `CIRCLE` | Circonferenza intera | Vedi §6 per limitazioni offset |
 | `LWPOLYLINE` | Polilinea 2D leggera | La più comune nei profili CAD |
 | `POLYLINE` | Polilinea classica | Supporto completo |
-| `SPLINE` | Curva B-spline | Interpolata tramite punti di controllo |
+| `SPLINE` | Curva B-spline | Valutata tramite algoritmo de Boor sui punti di controllo |
 
 **Entità non riconosciute** (presenti nel DXF ma ignorate): blocchi (`BLOCK`), testi (`TEXT`, `MTEXT`), quote (`DIMENSION`), tratteggi (`HATCH`), entità 3D.
 
@@ -93,7 +93,7 @@ Il pannello in basso contiene tutte le impostazioni operative, organizzate in se
 
 - **Dati** — caricamento file DXF e CSV
 - **Offset Parallelo** — distanza e applicazione offset
-- **Passo Interpolazione** — configurazione densità punti
+- **Passo Interpolazione** — configurazione densità punti e visualizzazione punti
 - **Limiti Orizzontali** — definizione zona di taglio (L1, L2)
 
 ### Area grafico
@@ -122,7 +122,7 @@ File DXF
 [Importa DXF]  ──→  Il profilo appare sul grafico
     │
     ▼
-[Imposta Passo Interpolazione]  ──→  Definisce la densità dei punti
+[Verifica Passo Interpolazione]  ──→  Calcolato automaticamente al caricamento
     │
     ▼
 [Posiziona L1 e L2]  ──→  Ritaglio della zona di interesse
@@ -166,7 +166,11 @@ Un profilo aperto è una sequenza di curve con punto iniziale e finale distinti,
 
 ### 6.2 Spline
 
-Le spline B-spline vengono prima campionate ad alta risoluzione tramite interpolazione Catmull-Rom sui punti di controllo, poi ricampionate con il passo di interpolazione impostato. Se la spline ha `fitPoints` (punti di passaggio), vengono usati quelli al posto dei punti di controllo.
+Le curve SPLINE vengono valutate con l'**algoritmo di de Boor** (B-Spline). Se il DXF contiene il vettore dei nodi (group code 40), viene usato direttamente; altrimenti viene generato automaticamente un vettore nodo clamped uniforme di grado appropriato.
+
+Il calcolo avviene sui **punti di controllo** (group code 10/20). I punti di fitting (group code 11/21), se presenti, vengono usati come fallback solo quando i punti di controllo non sono disponibili.
+
+La curva ad alta risoluzione generata dall'algoritmo viene poi ricampionata con il passo di interpolazione impostato (vedi §7).
 
 ### 6.3 Archi
 
@@ -201,8 +205,8 @@ Un passo **grande** produce meno punti, sufficiente per profili con curvature gr
 Il valore si imposta nel campo **Precisione** nella sezione "Passo Interpolazione".
 
 - **Unità:** nell'unità di misura corrente (mm, m, ecc.)
-- **Valore di default:** 0.005
-- 
+- **Valore automatico:** al caricamento di un file, il passo viene calcolato automaticamente come `rangeX / 100` arrotondato alla prima cifra significativa (es. range 100mm → passo 1mm, range 0.1mm → passo 0.001mm). Il valore può essere modificato manualmente in qualsiasi momento.
+
 > 📷 **[Figura 7 — IMMAGINE: dettaglio sezione interpolazione nel pannello con frecce sui campi Precisione e Modalità]**
 
 ### 7.3 Modalità di interpolazione
@@ -262,7 +266,13 @@ Si calcola l'escursione in X dell'arco (considerando gli eventuali attraversamen
 
 ---
 
-### 7.4 Interazione tra interpolazione e offset
+### 7.4 Visualizzazione dei punti interpolati
+
+Il pulsante **Mostra Punti** nella sezione interpolazione visualizza sul grafico i singoli punti generati dall'interpolazione come cerchi di piccole dimensioni (colore arancione). Premere nuovamente per nasconderli (**Nascondi Punti**).
+
+Questa funzione è utile per verificare visivamente la densità e la distribuzione dei punti prima dell'esportazione.
+
+### 7.5 Interazione tra interpolazione e offset
 
 L'interpolazione viene applicata prima del calcolo dell'offset. I segmenti risultanti dall'interpolazione sono i segmenti su cui viene costruita la curva offset. Quindi:
 
@@ -287,7 +297,7 @@ I limiti L1 e L2 definiscono la **zona di interesse** del profilo: solo i punti 
 
 ### Comportamento all'esportazione
 
-Il CSV esportato conterrà solo i punti con `X ≥ min(L1, L2)` e `X ≤ max(L1, L2)`, ordinati per X crescente. Il punto con X minore viene riposizionato a X = 0 nel file esportato (vedi §11).
+Il CSV esportato conterrà solo i punti con `X ≥ min(L1, L2)` e `X ≤ max(L1, L2)`, ordinati per X crescente. Il punto con X minore viene riposizionato a X = 0 nel file esportato (vedi §10.2).
 
 ---
 
@@ -301,7 +311,7 @@ L'offset parallelo calcola una nuova curva a **distanza costante** dal profilo o
 
 ### 9.2 Utilizzo
 
-1. Impostare la **distanza di offset** nel campo apposito (valore positivo = sposta la curva verso l'alto, negativo verso il basso)
+1. Impostare la **distanza di offset** nel campo apposito (valore positivo = sposta la curva verso l'alto per profili prevalentemente orizzontali, negativo verso il basso)
 2. Premere **Applica Offset**
 3. La curva offset appare in arancione scuro
 4. La curva offset è quella che verrà esportata se presente (priorità sull'originale)
@@ -333,7 +343,7 @@ Il CSV esportato contiene:
 - **Intestazione:** `x_mm,y_mm` (o con l'unità selezionata, es. `x_m,y_m`)
 - **Punti:** solo quelli compresi tra L1 e L2, ordinati per X crescente
 - **Origine X a zero:** la X del primo punto viene sottratta da tutti i punti → il profilo parte sempre da X = 0
-- **Coordinata Y:** coordinate Y originali (l'offset parallelo agisce sulla forma della curva, non traslando la Y)
+- **Coordinata Y:** i valori Y della curva esportata (originale o offset); se è attivo un offset parallelo, i valori Y riflettono la curva traslata perpendicolarmente
 
 **Esempio di output:**
 
@@ -365,7 +375,7 @@ Se l'unità del file sorgente è nota (rilevata dal DXF o impostata manualmente)
 
 ## 11. Unità di misura
 
-Il selettore **UM** nella pannello in basso imposta l'unità di misura per la visualizzazione degli assi e per i valori numerici dei controlli (L1, L2, passo, offset).
+Il selettore **UM** nel pannello in basso imposta l'unità di misura per la visualizzazione degli assi e per i valori numerici dei controlli (L1, L2, passo, offset).
 
 **Unità disponibili:** `mm`, `cm`, `m`, `in`, `ft`
 
@@ -390,7 +400,7 @@ Le etichette degli assi si aggiornano mostrando i valori correnti della finestra
 
 ### Scale degli assi
 
-Il grafico mantiene sempre una **scala 1:1** tra X e Y: una unità in orizzontale corrisponde alla stessa distanza fisica in verticale. Questo garantisce che il profilo sia visualizzato con le proporzioni geometriche reali.
+Il grafico utilizza **scale indipendenti** per X e Y: ciascun asse viene scalato in modo da occupare l'intera dimensione del grafico. Questo garantisce la massima leggibilità del profilo indipendentemente dal rapporto di aspetto tra le coordinate.
 
 Le etichette degli assi mostrano sempre i valori del range visibile corrente, anche durante lo zoom.
 

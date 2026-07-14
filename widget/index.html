@@ -542,6 +542,7 @@
                     </label>
                 </div>
 
+
                 <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
                     <span data-i18n="label_points_generated">Punti generati:</span>
                     <span id="generatedPointsCount" style="color: var(--accent-color); font-weight: bold;">0</span>
@@ -798,6 +799,7 @@
 
         let INTERPOLATION_STEP = 0.005;
         let INTERPOLATION_MODE = 'geometric'; // 'geometric' o 'deltaX'
+        let SPLINE_CURVE_ALGO = 'bspline'; // 'catmull-rom' o 'bspline'
 
         let _autoStepApplied = false; // si resetta solo al caricamento di un file nuovo
         let showInterpolatedPoints = false;
@@ -921,10 +923,11 @@
                 const rangeX = chartState.axisMaxX - chartState.axisMinX;
                 if (rangeX > 0) {
                     _autoStepApplied = true;
-                    const autoStep = rangeX / 100;
+                    const autoStep = floorToFirstSigFig(rangeX / 100);
                     INTERPOLATION_STEP = autoStep;
-                    document.getElementById('interpolationInput').value = autoStep;
-                    document.getElementById('interpolationValue').textContent = autoStep.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+                    const autoStepStr = autoStep.toPrecision(1);
+                    document.getElementById('interpolationInput').value = autoStepStr;
+                    document.getElementById('interpolationValue').textContent = autoStepStr;
                     reloadLastFile();
                     return;
                 }
@@ -1543,6 +1546,12 @@
             drawChart();
         }
 
+        function floorToFirstSigFig(x) {
+            if (x <= 0) return x;
+            const mag = Math.pow(10, Math.floor(Math.log10(x)));
+            return Math.floor(x / mag) * mag;
+        }
+
         function toggleShowPoints() {
             showInterpolatedPoints = !showInterpolatedPoints;
             const btn = document.getElementById('togglePointsBtn');
@@ -1571,6 +1580,12 @@
             reloadLastFile();
         }
 
+        function setSplineCurveAlgo(algo) {
+            SPLINE_CURVE_ALGO = algo;
+            console.log('Algoritmo curva spline:', algo);
+            reloadLastFile();
+        }
+
         function setLine1X(value) {
             chartState.line1X = parseFloat(value) || 0;
             updateUI();
@@ -1587,8 +1602,10 @@
             document.getElementById('dataPointsCount').textContent = chartState.data.length;
             document.getElementById('generatedPointsCount').textContent = chartState.data.length;
             document.getElementById('offsetYValue').textContent = chartState.offsetY.toFixed(0);
-            document.getElementById('interpolationValue').textContent = INTERPOLATION_STEP.toFixed(3);
-            document.getElementById('currentInterpolation').textContent = INTERPOLATION_STEP.toFixed(3);
+            const stepStr = INTERPOLATION_STEP > 0 ? INTERPOLATION_STEP.toPrecision(1) : String(INTERPOLATION_STEP);
+            document.getElementById('interpolationInput').value = stepStr;
+            document.getElementById('interpolationValue').textContent = stepStr;
+            document.getElementById('currentInterpolation').textContent = stepStr;
 
             // Calcola range se ci sono dati
             if (chartState.data.length > 0) {
@@ -2290,10 +2307,11 @@
                     const rangeX = chartState.axisMaxX - chartState.axisMinX;
                     if (rangeX > 0) {
                         _autoStepApplied = true;
-                        const autoStep = rangeX / 100;
+                        const autoStep = floorToFirstSigFig(rangeX / 100);
                         INTERPOLATION_STEP = autoStep;
-                        document.getElementById('interpolationInput').value = autoStep;
-                        document.getElementById('interpolationValue').textContent = autoStep.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+                        const autoStepStr = autoStep.toPrecision(1);
+                        document.getElementById('interpolationInput').value = autoStepStr;
+                        document.getElementById('interpolationValue').textContent = autoStepStr;
                         reloadLastFile();
                         return;
                     }
@@ -2393,14 +2411,22 @@
             const controlY = entity.data[20] || [];
             const fitX = entity.data[11] || [];
             const fitY = entity.data[21] || [];
+            const knotsRaw = entity.data[40] || [];
             const degree = entity.data[71] ? parseInt(entity.data[71][0]) : 3;
             const closed = entity.data[70] && parseInt(entity.data[70][0]) & 1;
 
-            // Usa fit points se disponibili, altrimenti control points
-            let xs = fitX.length > 0 ? fitX : controlX;
-            let ys = fitY.length > 0 ? fitY : controlY;
+            // B-Spline usa sempre i control points; Catmull-Rom preferisce fit points
+            let xs, ys;
+            if (SPLINE_CURVE_ALGO === 'bspline' && controlX.length >= 2) {
+                xs = controlX;
+                ys = controlY;
+            } else {
+                xs = fitX.length > 0 ? fitX : controlX;
+                ys = fitY.length > 0 ? fitY : controlY;
+            }
 
-            console.log('  SPLINE con ' + xs.length + ' punti originali, degree=' + degree + ', closed=' + closed);
+            const knots = knotsRaw.map(k => parseFloat(k));
+            console.log('  SPLINE algo=' + SPLINE_CURVE_ALGO + ' punti=' + xs.length + ' knots=' + knots.length + ' degree=' + degree + ' closed=' + closed);
 
             if (xs.length < 2) {
                 console.warn('  SPLINE senza punti sufficienti');
@@ -2410,7 +2436,12 @@
             const startLength = xPoints.length;
 
             // Genera una rappresentazione ad alta risoluzione della spline (curva liscia)
-            const highResPoints = generatePolygonalVertices(xs, ys, closed, 5000);
+            let highResPoints;
+            if (SPLINE_CURVE_ALGO === 'bspline') {
+                highResPoints = generateBSplineVertices(xs, ys, knots, degree, 5000);
+            } else {
+                highResPoints = generatePolygonalVertices(xs, ys, closed, 5000);
+            }
 
             if (highResPoints.length === 0) {
                 console.warn('  SPLINE: nessun punto generato');
@@ -2576,6 +2607,68 @@
             );
 
             return { x: x, y: y };
+        }
+
+        // Valutazione B-Spline con algoritmo de Boor
+        // degree: grado della curva; knots: vettore nodo; controlPts: [{x,y}]; t: parametro [tMin, tMax]
+        function deBoorEval(degree, knots, controlPts, t) {
+            const n = controlPts.length - 1;
+            // Trova l'indice k tale che knots[k] <= t < knots[k+1]
+            let k = degree;
+            for (let i = degree; i < knots.length - degree - 1; i++) {
+                if (t >= knots[i] && t < knots[i + 1]) { k = i; break; }
+                if (i === knots.length - degree - 2) k = i; // clamp all'ultimo
+            }
+
+            // de Boor recursion
+            const d = [];
+            for (let j = 0; j <= degree; j++) {
+                const idx = k - degree + j;
+                d[j] = { x: controlPts[idx].x, y: controlPts[idx].y };
+            }
+            for (let r = 1; r <= degree; r++) {
+                for (let j = degree; j >= r; j--) {
+                    const ki = k - degree + j;
+                    const denom = knots[ki + degree - r + 1] - knots[ki];
+                    const alpha = denom === 0 ? 0 : (t - knots[ki]) / denom;
+                    d[j].x = (1 - alpha) * d[j - 1].x + alpha * d[j].x;
+                    d[j].y = (1 - alpha) * d[j - 1].y + alpha * d[j].y;
+                }
+            }
+            return d[degree];
+        }
+
+        // Genera punti ad alta risoluzione da una B-Spline usando de Boor
+        function generateBSplineVertices(xs, ys, knots, degree, numPoints) {
+            const controlPts = [];
+            for (let i = 0; i < xs.length; i++) {
+                controlPts.push({ x: parseFloat(xs[i]), y: parseFloat(ys[i]) });
+            }
+            if (controlPts.length < 2) return controlPts;
+
+            // Se non ci sono knot dal DXF, genera uniform clamped knot vector
+            if (!knots || knots.length === 0) {
+                const n = controlPts.length - 1;
+                const p = degree;
+                const m = n + p + 1;
+                knots = [];
+                for (let i = 0; i <= m; i++) {
+                    if (i <= p) knots.push(0);
+                    else if (i >= m - p) knots.push(1);
+                    else knots.push((i - p) / (n - p + 1));
+                }
+            }
+
+            const tMin = knots[degree];
+            const tMax = knots[knots.length - degree - 1];
+            const points = [];
+
+            for (let i = 0; i <= numPoints; i++) {
+                const t = tMin + (tMax - tMin) * i / numPoints;
+                const pt = deBoorEval(degree, knots, controlPts, t < tMax ? t : tMax - 1e-10);
+                points.push(pt);
+            }
+            return points;
         }
 
         // ===== FUNZIONI LEGACY (NON PIÙ USATE) =====
@@ -3176,6 +3269,9 @@ label_range_y,Range Y,Range Y
 label_um,Unità,Unit
 label_show_points,Mostra Punti,Show Points
 label_hide_points,Nascondi Punti,Hide Points
+label_spline_algo,Curva spline:,Spline curve:
+label_algo_catmull,Catmull-Rom,Catmull-Rom
+label_algo_bspline,B-Spline (de Boor),B-Spline (de Boor)
 label_um_from_dxf,Unità rilevata dal file DXF (non modificabile),Unit detected from DXF file (read-only)
 label_export_um,Unità esportazione,Export unit
 canvas_no_data,Nessun dato disponibile.,No data available.
