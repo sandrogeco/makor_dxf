@@ -796,7 +796,7 @@
         let INTERPOLATION_STEP = 0.005;
         let INTERPOLATION_MODE = 'geometric'; // 'geometric' o 'deltaX'
 
-        let _autoStepReload = false; // previene loop nel reload automatico passo
+        let _autoStepApplied = false; // si resetta solo al caricamento di un file nuovo
 
         // Salva l'ultimo file caricato per refresh automatico
         let lastDxfString = null;
@@ -913,16 +913,15 @@
 
             document.getElementById('connectionStatus').textContent = `${t('status_csv_loaded')} (${chartState.data.length} ${t('status_points')})`;
 
-            if (!_autoStepReload) {
+            if (!_autoStepApplied) {
                 const rangeX = chartState.axisMaxX - chartState.axisMinX;
                 if (rangeX > 0) {
-                    _autoStepReload = true;
+                    _autoStepApplied = true;
                     const autoStep = rangeX / 100;
                     INTERPOLATION_STEP = autoStep;
                     document.getElementById('interpolationInput').value = autoStep;
                     document.getElementById('interpolationValue').textContent = autoStep.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
                     reloadLastFile();
-                    _autoStepReload = false;
                     return;
                 }
             }
@@ -1935,6 +1934,7 @@
         function handleCSVUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
+            _autoStepApplied = false;
 
             const csvLabel = document.getElementById('csvImportLabel');
             if (csvLabel) csvLabel.textContent = t('label_importing');
@@ -1983,6 +1983,7 @@
         function handleDXFUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
+            _autoStepApplied = false;
 
             const dxfLabel = document.getElementById('dxfImportLabel');
             if (dxfLabel) dxfLabel.textContent = t('label_importing');
@@ -2259,16 +2260,15 @@
                 // Esporta CSV (opzionale)
                 exportToCSV(chartState.data);
 
-                if (!_autoStepReload) {
+                if (!_autoStepApplied) {
                     const rangeX = chartState.axisMaxX - chartState.axisMinX;
                     if (rangeX > 0) {
-                        _autoStepReload = true;
+                        _autoStepApplied = true;
                         const autoStep = rangeX / 100;
                         INTERPOLATION_STEP = autoStep;
                         document.getElementById('interpolationInput').value = autoStep;
                         document.getElementById('interpolationValue').textContent = autoStep.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
                         reloadLastFile();
-                        _autoStepReload = false;
                         return;
                     }
                 }
