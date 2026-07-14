@@ -29,7 +29,7 @@ Il visualizzatore profilo consente di:
 - Calcolare la **curva offset parallela** a distanza configurabile
 - Esportare i punti risultanti come **CSV** pronto per il controllo macchina
 
-> 📷 **[Figura 1 — IMMAGINE: schermata completa dell'applicazione con un profilo caricato, evidenziare le zone principali: grafico, pannello sinistro, barra di zoom]**
+> 📷 **[Figura 1 — IMMAGINE: schermata completa dell'applicazione con un profilo caricato, evidenziare le zone principali: grafico, pannello in basso, barra di zoom]**
 
 ---
 
@@ -87,9 +87,9 @@ X,Y
 
 ## 3. Interfaccia
 
-### Pannello sinistro
+### Pannello in basso
 
-Il pannello sinistro contiene tutte le impostazioni operative, organizzate in sezioni:
+Il pannello in basso contiene tutte le impostazioni operative, organizzate in sezioni:
 
 - **Dati** — caricamento file DXF e CSV
 - **Offset Parallelo** — distanza e applicazione offset
@@ -281,7 +281,7 @@ I limiti L1 e L2 definiscono la **zona di interesse** del profilo: solo i punti 
 
 **Tramite trascinamento:** cliccare e trascinare le linee verticali direttamente sul grafico.
 
-**Tramite input numerico:** digitare il valore nel campo corrispondente (L1 e L2 nel pannello sinistro).
+**Tramite input numerico:** digitare il valore nel campo corrispondente (L1 e L2 nel pannello in basso).
 
 > 📷 **[Figura 10 — IMMAGINE: grafico con L1 e L2 visibili come linee verticali colorate, frecce che indicano la zona compresa tra i due limiti evidenziata]**
 
@@ -365,7 +365,7 @@ Se l'unità del file sorgente è nota (rilevata dal DXF o impostata manualmente)
 
 ## 11. Unità di misura
 
-Il selettore **UM** nella barra sinistra imposta l'unità di misura per la visualizzazione degli assi e per i valori numerici dei controlli (L1, L2, passo, offset).
+Il selettore **UM** nella pannello in basso imposta l'unità di misura per la visualizzazione degli assi e per i valori numerici dei controlli (L1, L2, passo, offset).
 
 **Unità disponibili:** `mm`, `cm`, `m`, `in`, `ft`
 

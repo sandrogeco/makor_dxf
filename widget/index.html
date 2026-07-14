@@ -581,10 +581,6 @@
                 <span class="info-value" id="dataPointsCount">0</span>
             </div>
             <div class="info-item">
-                <span class="info-label" data-i18n="label_offset_y">Offset Y</span>
-                <span class="info-value" id="currentOffsetY">0</span>
-            </div>
-            <div class="info-item">
                 <span class="info-label" data-i18n="label_interpolation">Interpolazione</span>
                 <span class="info-value" id="currentInterpolation">0.005</span>
             </div>
@@ -800,6 +796,8 @@
         let INTERPOLATION_STEP = 0.005;
         let INTERPOLATION_MODE = 'geometric'; // 'geometric' o 'deltaX'
 
+        let _autoStepReload = false; // previene loop nel reload automatico passo
+
         // Salva l'ultimo file caricato per refresh automatico
         let lastDxfString = null;
         let lastDxfFileName = null;
@@ -915,6 +913,20 @@
 
             document.getElementById('connectionStatus').textContent = `${t('status_csv_loaded')} (${chartState.data.length} ${t('status_points')})`;
 
+            if (!_autoStepReload) {
+                const rangeX = chartState.axisMaxX - chartState.axisMinX;
+                if (rangeX > 0) {
+                    _autoStepReload = true;
+                    const autoStep = rangeX / 100;
+                    INTERPOLATION_STEP = autoStep;
+                    document.getElementById('interpolationInput').value = autoStep;
+                    document.getElementById('interpolationValue').textContent = autoStep.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+                    reloadLastFile();
+                    _autoStepReload = false;
+                    return;
+                }
+            }
+
             updateUI();
             drawChart();
         }
@@ -945,6 +957,11 @@
             chartState.offsetSurvivors = [];
             stepState = null;
             document.getElementById('offsetYInput').value = 0;
+            if (chartState.data.length > 0) {
+                const ys = chartState.data.map(p => p.y);
+                chartState.axisMinY = Math.min(...ys);
+                chartState.axisMaxY = Math.max(...ys);
+            }
             updateUI();
             drawChart();
         }
@@ -1217,6 +1234,12 @@
             });
 
             stepState.currentIdx++;
+
+            if (chartState.offsetPolyline.length > 0) {
+                const allYs = [...chartState.data.map(p => p.y), ...chartState.offsetPolyline.map(p => p.y)];
+                chartState.axisMinY = Math.min(...allYs);
+                chartState.axisMaxY = Math.max(...allYs);
+            }
             drawChart();
         }
 
@@ -1502,6 +1525,16 @@
             });
 
             console.log('Polilinea offset:', chartState.offsetPolyline.length, 'punti');
+
+            // Riscala asse Y per includere la curva offset
+            if (chartState.offsetPolyline.length > 0) {
+                const allYs = [
+                    ...chartState.data.map(p => p.y),
+                    ...chartState.offsetPolyline.map(p => p.y)
+                ];
+                chartState.axisMinY = Math.min(...allYs);
+                chartState.axisMaxY = Math.max(...allYs);
+            }
 
             updateUI();
             drawChart();
@@ -2227,6 +2260,20 @@
 
                 // Esporta CSV (opzionale)
                 exportToCSV(chartState.data);
+
+                if (!_autoStepReload) {
+                    const rangeX = chartState.axisMaxX - chartState.axisMinX;
+                    if (rangeX > 0) {
+                        _autoStepReload = true;
+                        const autoStep = rangeX / 100;
+                        INTERPOLATION_STEP = autoStep;
+                        document.getElementById('interpolationInput').value = autoStep;
+                        document.getElementById('interpolationValue').textContent = autoStep.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+                        reloadLastFile();
+                        _autoStepReload = false;
+                        return;
+                    }
+                }
 
                 updateUI();
                 drawChart();
