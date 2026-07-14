@@ -1771,8 +1771,8 @@
                 ctx.stroke();
             }
 
-            // Punti interpolati (se attivati)
-            if (showInterpolatedPoints && chartState.data.length > 0) {
+            // Punti interpolati (se attivati, mai in modalità viewer)
+            if (showInterpolatedPoints && chartState.data.length > 0 && PARAM_MODE !== 'viewer') {
                 ctx.fillStyle = '#e07828';
                 const pts = chartState.data;
                 for (let i = 0; i < pts.length; i++) {
