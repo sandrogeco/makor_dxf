@@ -1678,17 +1678,19 @@
             const transformX = (x) => padding + (x - minX) * scale;
             const transformY = (y) => height - padding - (y - minY) * scale;
 
-            // Grid — copre tutto il plot area
+            // Grid — allineata ai dati (usa scale 1:1)
             ctx.strokeStyle = '#e0e0e0';
             ctx.lineWidth = 1;
             for (let i = 0; i <= 10; i++) {
-                const x = padding + plotWidth * (i / 10);
+                const xVal = minX + rangeX * (i / 10);
+                const x = transformX(xVal);
                 ctx.beginPath();
                 ctx.moveTo(x, padding);
                 ctx.lineTo(x, height - padding);
                 ctx.stroke();
 
-                const y = padding + plotHeight * (i / 10);
+                const yVal = minY + rangeY * (i / 10);
+                const y = transformY(yVal);
                 ctx.beginPath();
                 ctx.moveTo(padding, y);
                 ctx.lineTo(width - padding, y);
@@ -1717,15 +1719,15 @@
 
             const umSuffix = chartState.um ? ' ' + chartState.um : '';
             for (let i = 0; i <= 5; i++) {
-                const screenX = padding + plotWidth * (i / 5);
                 const value = minX + rangeX * (i / 5);
+                const screenX = transformX(value);
                 ctx.fillText(value.toFixed(decimalsX) + (i === 5 ? umSuffix : ''), screenX, height - padding + 20);
             }
 
             ctx.textAlign = 'right';
             for (let i = 0; i <= 5; i++) {
-                const screenY = padding + plotHeight * (i / 5);
                 const value = maxY - rangeY * (i / 5);
+                const screenY = transformY(value);
                 ctx.fillText(value.toFixed(decimalsY) + (i === 5 ? umSuffix : ''), padding - 10, screenY + 4);
             }
 
