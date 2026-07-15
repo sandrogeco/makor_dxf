@@ -520,7 +520,7 @@
                 <div class="slider-container">
                     <div class="slider-label">
                         <span data-i18n="label_precision">Precisione</span>
-                        <span class="slider-value" id="interpolationValue">0.005</span>
+                        <span class="slider-value" id="interpolationValue">0.005</span><span id="interpolationUm" style="font-size: 11px; color: var(--text-secondary); margin-left: 3px;"></span>
                     </div>
                     <input type="text" inputmode="none" readonly id="interpolationInput" value="0.005"
                            onclick="numpadOpen(this, t('label_interp_section'))"
@@ -894,6 +894,16 @@
             // Ordina per X crescente
             chartState.data.sort((a, b) => a.x - b.x);
 
+            // Rimuovi punti duplicati consecutivi
+            const beforeDedup = chartState.data.length;
+            chartState.data = chartState.data.filter((p, i) => {
+                if (i === 0) return true;
+                const prev = chartState.data[i - 1];
+                const dx = p.x - prev.x, dy = p.y - prev.y;
+                return Math.sqrt(dx*dx + dy*dy) > 1e-12;
+            });
+            console.log('CSV dedup: ' + beforeDedup + ' → ' + chartState.data.length + ' punti (' + (beforeDedup - chartState.data.length) + ' duplicati rimossi)');
+
             console.log('CSV parsato: ' + chartState.data.length + ' punti (ordinati per X)');
 
             // Inizializza limiti assi e linee al caricamento
@@ -923,7 +933,7 @@
                 const rangeX = chartState.axisMaxX - chartState.axisMinX;
                 if (rangeX > 0) {
                     _autoStepApplied = true;
-                    const autoStep = floorToFirstSigFig(calcMaxDeltaX(chartState.data) || rangeX / 100);
+                    const autoStep = convertUnit(0.5, 'mm', chartState.um || 'mm');
                     INTERPOLATION_STEP = autoStep;
                     const autoStepStr = autoStep.toPrecision(1);
                     document.getElementById('interpolationInput').value = autoStepStr;
@@ -1005,6 +1015,10 @@
                 }
             }
 
+            // Normalizza: garantisce ax <= bx
+            allSegments = allSegments.map(s =>
+                s.bx < s.ax ? { ax: s.bx, ay: s.by, bx: s.ax, by: s.ay } : s
+            );
             // Ordina per X
             allSegments.sort((a, b) => Math.min(a.ax, a.bx) - Math.min(b.ax, b.bx));
 
@@ -1283,6 +1297,19 @@
                 }
             }
 
+            // Rimuovi segmenti di lunghezza zero (punti duplicati consecutivi)
+            const eps = INTERPOLATION_STEP / 1000;
+            allSegments = allSegments.filter(s => {
+                const dx = s.bx - s.ax, dy = s.by - s.ay;
+                return Math.sqrt(dx*dx + dy*dy) > eps;
+            });
+
+            // Normalizza: garantisce ax <= bx (dx >= 0) così le normali puntano sempre
+            // nello stesso verso (CCW rispetto alla direzione sinistra→destra)
+            allSegments = allSegments.map(s =>
+                s.bx < s.ax ? { ax: s.bx, ay: s.by, bx: s.ax, by: s.ay } : s
+            );
+
             console.log('Segmenti trovati:', allSegments.length);
 
             // Log ordine segmenti PRIMA dell'ordinamento
@@ -1495,6 +1522,9 @@
                     console.log(`  Nuovo segmento: (${lastIntersection.x.toFixed(4)}, ${lastIntersection.y.toFixed(4)}) -> (${newSeg.xf.toFixed(4)}, ${newSeg.yf.toFixed(4)})`);
                 }
                 // Se nessuna intersezione valida, non aggiungiamo nulla (no "collegamento normale")
+                if (!lastIntersection) {
+                    console.warn(`  ⚠️ so_${i} SCARTATO: nessuna intersezione valida trovata. xi=(${newSeg.xi.toFixed(4)},${newSeg.yi.toFixed(4)}) xf=(${newSeg.xf.toFixed(4)},${newSeg.yf.toFixed(4)}) m=${newSeg.m.toFixed(4)}`);
+                }
 
                 console.log(`  Survivors totali: ${survivors.length}`);
             }
@@ -1614,6 +1644,7 @@
             const stepStr = INTERPOLATION_STEP > 0 ? INTERPOLATION_STEP.toPrecision(1) : String(INTERPOLATION_STEP);
             document.getElementById('interpolationInput').value = stepStr;
             document.getElementById('interpolationValue').textContent = stepStr;
+            document.getElementById('interpolationUm').textContent = chartState.um || 'mm';
             document.getElementById('currentInterpolation').textContent = stepStr;
 
             // Calcola range se ci sono dati
@@ -2263,9 +2294,16 @@
 
                 // Converti in formato chartState.data (coordinate originali, nessuna traslazione)
                 chartState.data = [];
+                let dxfDupCount = 0;
                 for (let i = 0; i < xPoints.length; i++) {
+                    if (i > 0) {
+                        const prev = chartState.data[chartState.data.length - 1];
+                        const dx = xPoints[i] - prev.x, dy = yPoints[i] - prev.y;
+                        if (Math.sqrt(dx*dx + dy*dy) <= 1e-12) { dxfDupCount++; continue; }
+                    }
                     chartState.data.push({ x: xPoints[i], y: yPoints[i] });
                 }
+                console.log('DXF dedup: ' + xPoints.length + ' → ' + chartState.data.length + ' punti (' + dxfDupCount + ' duplicati rimossi)');
 
                 // Salva i segmenti separati (coordinate originali)
                 chartState.segments = segments.map(seg => ({
@@ -2316,7 +2354,7 @@
                     const rangeX = chartState.axisMaxX - chartState.axisMinX;
                     if (rangeX > 0) {
                         _autoStepApplied = true;
-                        const autoStep = floorToFirstSigFig(calcMaxDeltaX(chartState.data) || rangeX / 100);
+                        const autoStep = convertUnit(0.5, 'mm', chartState.um || 'mm');
                         INTERPOLATION_STEP = autoStep;
                         const autoStepStr = autoStep.toPrecision(1);
                         document.getElementById('interpolationInput').value = autoStepStr;
